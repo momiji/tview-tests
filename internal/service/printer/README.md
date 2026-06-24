@@ -52,9 +52,9 @@ and `Enable`/`Disable`/`Flush` already cover that.
   prefixes a timestamp and queues the result via `Println`.
 - `request.go` — request/trace-specific logging, kept separate from the
   general-purpose methods above because it's only meaningful while
-  processing a request: `traceInfo`/`newTraceInfo` tag a request with an
-  id and stage name, `(*Printer).Tracef` logs a line tagged with one, and
-  `(*Printer).Header` logs an HTTP header while redacting
+  processing a request: `ReqLogInfo`/`NewReqLogInfo` tag a request with an
+  id and stage name, `(*Printer).ReqInfof` logs a line tagged with one,
+  and `(*Printer).ReqHeaderf` logs an HTTP header while redacting
   `Proxy-Authorization` values down to a short prefix.
 
 The clock (see [../clock/README.md](../clock/README.md)) always calls

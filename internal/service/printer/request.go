@@ -5,25 +5,25 @@ import (
 	"strings"
 )
 
-// traceInfo tags a connection/request for tracing: a request id plus a
+// ReqLogInfo tags a connection/request for tracing: a request id plus a
 // short name identifying which stage of the pipeline is logging.
-type traceInfo struct {
+type ReqLogInfo struct {
 	reqId int32
 	name  string
 }
 
-func newTraceInfo(reqId int32, name string) *traceInfo {
-	return &traceInfo{reqId, name}
+func NewReqLogInfo(reqId int32, name string) *ReqLogInfo {
+	return &ReqLogInfo{reqId, name}
 }
 
-// Tracef logs a per-request trace line tagged with ti's id and name.
-func (p *Printer) Tracef(ti *traceInfo, format string, args ...interface{}) {
+// ReqInfof logs a per-request info line tagged with ti's id and name.
+func (p *Printer) ReqInfof(ti *ReqLogInfo, format string, args ...interface{}) {
 	p.Printf("(%d) %s: %s", ti.reqId, ti.name, fmt.Sprintf(format, args...))
 }
 
-// Header logs an HTTP header, redacting the value of Proxy-Authorization
+// ReqHeaderf logs an HTTP header, redacting the value of Proxy-Authorization
 // down to a short prefix instead of printing it in full.
-func (p *Printer) Header(format string, prefix string, header string) {
+func (p *Printer) ReqHeaderf(format string, prefix string, header string) {
 	lower := strings.ToLower(header)
 	if strings.HasPrefix(lower, "proxy-authorization:") {
 		l := len(header)
