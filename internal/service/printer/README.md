@@ -48,8 +48,8 @@ clock's output — no separate logging library or lifecycle (kpx's
 and `Enable`/`Disable`/`Flush` already cover that.
 
 - `logger.go` — general-purpose formatted logging: `(*Printer).Printf`,
-  `Infof`, `Errorf`, `Fatalf` (which logs then calls `os.Exit(1)`). Each
-  prefixes a timestamp and queues the result via `Println`.
+  `Infof`, `Errorf`. Each prefixes a timestamp and queues the result via
+  `Println`. kpx's `logFatal` was not migrated.
 - `request.go` — request/trace-specific logging, kept separate from the
   general-purpose methods above because it's only meaningful while
   processing a request: `ReqLogInfo`/`NewReqLogInfo` tag a request with an

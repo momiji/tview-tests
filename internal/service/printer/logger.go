@@ -2,7 +2,6 @@ package printer
 
 import (
 	"fmt"
-	"os"
 	"time"
 )
 
@@ -23,10 +22,4 @@ func (p *Printer) Infof(format string, args ...interface{}) {
 // Errorf logs at error level.
 func (p *Printer) Errorf(format string, args ...interface{}) {
 	p.Printf(format, args...)
-}
-
-// Fatalf logs at fatal level, then exits the process.
-func (p *Printer) Fatalf(format string, args ...interface{}) {
-	p.Printf(format, args...)
-	os.Exit(1) // TODO p.exit ?
 }
