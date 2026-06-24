@@ -16,10 +16,6 @@ import (
 // tickInterval is how often the current time is refreshed and printed.
 const tickInterval = 2 * time.Second
 
-// startupTextDuration is how long --ui mode stays in text mode on startup
-// before automatically switching to the tview UI.
-const startupTextDuration = 3 * time.Second
-
 // RunConsole is plain-console mode: print the current time every tick
 // until ctx is cancelled (e.g. Ctrl-C).
 func RunConsole(ctx context.Context) {
@@ -29,30 +25,21 @@ func RunConsole(ctx context.Context) {
 	clk.Run(ctx, p)
 }
 
-// RunUI drives --ui mode. It starts in text mode and automatically
-// switches to the tview UI after startupTextDuration (or sooner, if the
-// user presses space first), then lets the user toggle between the two
-// with the spacebar. Pressing q/Q/Ctrl-C quits from either mode; because
+// RunUI drives --ui mode. It starts in text mode and switches to the tview
+// UI as soon as either the user presses space or autoSwitch fires —
+// autoSwitch is owned and triggered by the caller, e.g. on a startup timer,
+// so RunUI itself has no notion of why or when that happens. After the
+// first switch, the user can keep toggling between text and UI mode with
+// the spacebar. Pressing q/Q/Ctrl-C quits from either mode; because
 // tview's Stop() and textmode's terminal restore both run before this
 // function returns, the terminal is always left back in plain console
 // state.
-func RunUI(ctx context.Context) error {
+func RunUI(ctx context.Context, autoSwitch <-chan struct{}) error {
 	clk := clock.New(tickInterval)
 	p := printer.New()
 	go clk.Run(ctx, p)
 
-	fmt.Println("tview-tests --ui: starting in text mode, switching to UI mode in 3s (or press space)...")
-
-	// The startup auto-switch is fired asynchronously, on its own timer
-	// goroutine, rather than being a parameter textmode itself understands.
-	// This stands in for some other, real trigger that could ask for the
-	// switch at an arbitrary time; textmode.Run only knows it was told to
-	// switch, not why.
-	autoSwitch := make(chan struct{})
-	go func() {
-		time.Sleep(startupTextDuration)
-		close(autoSwitch)
-	}()
+	fmt.Println("tview-tests --ui: starting in text mode, switching to UI mode automatically or on space...")
 
 	sig, err := textmode.Run(autoSwitch)
 	if err != nil {

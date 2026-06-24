@@ -7,20 +7,22 @@ front ends: plain console and a `tview`-based TUI that can be toggled live.
 
 ```
 go run .            # plain console mode (default)
-go run . --ui        # UI mode: starts in text mode, auto-switches to tview UI
+go run . --ui        # UI mode: starts in text mode, auto-switches to tview UI after 3s
 ```
 
 | Mode                | How to enter                              | How to leave                          |
 |---------------------|--------------------------------------------|----------------------------------------|
 | Console (no `--ui`) | default                                    | Ctrl-C (process signal)                |
-| `--ui` text mode    | automatic, briefly, when `--ui` starts; or pressing **space** while in UI mode | press **space** → UI mode; `q`/`Q`/Ctrl-C → quit |
-| `--ui` UI mode      | automatic right after startup; or pressing **space** while in text mode       | press **space** → text mode; `q`/`Q`/Ctrl-C → quit |
+| `--ui` text mode    | when `--ui` starts; or pressing **space** while in UI mode | press **space** → UI mode; 3s startup timer → UI mode (first time only); `q`/`Q`/Ctrl-C → quit |
+| `--ui` UI mode      | automatically 3s after startup if nothing else happens first; or pressing **space** while in text mode | press **space** → text mode; `q`/`Q`/Ctrl-C → quit |
 
-`--ui` mode **always starts in text mode and immediately auto-switches to UI
-mode** — no keypress needed for that first transition. After that, space
-toggles between the two for as long as the app runs. Quitting from either
-mode (via `q`/`Q`/Ctrl-C) always leaves the terminal back in normal console
-state before the process exits, because both the tview screen and the raw
+`--ui` mode **always starts in text mode**. `main.go` starts a 3-second timer
+when launching UI mode; if it fires (and the user hasn't already pressed
+space), it asks `app.RunUI` to switch to the tview UI — see "External
+auto-switch trigger" below. After that first transition, space toggles
+between the two for as long as the app runs. Quitting from either mode (via
+`q`/`Q`/Ctrl-C) always leaves the terminal back in normal console state
+before the process exits, because both the tview screen and the raw
 terminal mode are torn down before `Run` returns.
 
 ## Core idea: one stored value, one push consumer, one pull consumer
@@ -66,6 +68,15 @@ decoupled from the clock's tick interval.
   (scrollback works, since raw mode only affects input echo/buffering, not
   the scrollback buffer). Restores the terminal before returning.
 
+  `Run(switchSignal <-chan struct{})` waits for either a keypress or
+  `switchSignal` to fire — both space and a closed `switchSignal` return
+  `SwitchToUI`; `q`/`Q`/Ctrl-C return `Quit`. Internally it polls stdin
+  with `golang.org/x/sys/unix.Poll` on a short fixed interval rather than
+  doing one blocking `Read`, so it can also check `switchSignal` regularly
+  and so that, whichever fires, there's never a goroutine left blocked on
+  stdin afterwards (which would otherwise race a later call to `Run`).
+  Pass `nil` for `switchSignal` to only react to keypresses.
+
 - **`internal/tui`** — the tview UI: a single bordered `TextView`, redrawn
   by its own `refreshInterval` ticker (500ms) that calls `clk.Now()` and
   pushes the result into the view via `QueueUpdateDraw`. This polling loop
@@ -77,14 +88,35 @@ decoupled from the clock's tick interval.
 - **`internal/app`** — orchestrates the two top-level entry points:
   - `RunConsole(ctx)`: the original plain-console behavior — `clk.Run(ctx,
     p)` directly, printing forever until `ctx` is cancelled (Ctrl-C).
-  - `RunUI(ctx)`: starts `clk.Run(ctx, p)` in the background, disables the
-    printer, and loops calling `tui.Run` and `textmode.Run` alternately
-    based on which `Signal` each one returns (`SwitchToText`/`SwitchToUI`
-    or `Quit`), enabling/disabling the printer to match whichever mode is
-    currently active.
+  - `RunUI(ctx, autoSwitch <-chan struct{})`: starts `clk.Run(ctx, p)` in
+    the background, then enters text mode via `textmode.Run(autoSwitch)`.
+    Once that first switch happens (by keypress or `autoSwitch`), it loops
+    calling `tui.Run` and `textmode.Run(nil)` alternately based on which
+    `Signal` each one returns (`SwitchToText`/`SwitchToUI` or `Quit`),
+    enabling/disabling the printer to match whichever mode is currently
+    active. `RunUI` itself has no notion of *why* or *when* `autoSwitch`
+    fires — that's entirely up to the caller.
 
 - **`main.go`** — parses the `--ui` flag and a `signal.NotifyContext` for
-  Ctrl-C, then dispatches to `app.RunConsole` or `app.RunUI`.
+  Ctrl-C, then dispatches to `app.RunConsole` or `app.RunUI`. For `--ui`,
+  it also owns the "external auto-switch trigger" channel (see below) and
+  passes it into `app.RunUI`.
+
+## External auto-switch trigger
+
+`app.RunUI` doesn't have a "switch to UI after N seconds" feature built in.
+Instead it takes an `autoSwitch <-chan struct{}` parameter and treats it
+exactly like a spacebar press: closing it asks for an immediate switch to
+UI mode, whenever that happens. `main.go` is the one piece of code that
+actually decides *when*: it creates the channel and calls
+`time.AfterFunc(3*time.Second, func() { close(autoSwitch) })` before
+calling `RunUI`.
+
+This keeps the "switch after 3 seconds on startup" policy out of `app` and
+`textmode` entirely — they only know about a generic external signal. In
+this app that signal happens to be a timer, but it stands in for any other
+real-world trigger (e.g. an event from elsewhere in a larger program) that
+might want to force the UI open without the user pressing space.
 
 ## Why push for the printer but pull for the UI?
 
