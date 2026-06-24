@@ -26,9 +26,11 @@ into the rest of the app.
   printing, which left exactly that race open).
 - `(*Printer).Println(a ...any)` — formats a line and enqueues it for the
   worker to write; a no-op when disabled. Never blocks on I/O: if the
-  internal queue (`queueSize`, currently 1024 — sized for bursts of
+  internal queue (`queueSize`, currently 10000 — sized for bursts of
   per-request trace logging, not just the clock's one-line-every-2s
-  ticks) is full, the line is dropped rather than stalling the caller.
+  ticks; matches kpx's old `DefaultQueueSize`, the equivalent knob in
+  go-logging's async logger) is full, the line is dropped rather than
+  stalling the caller.
 - `(*Printer).Flush(ctx context.Context) error` — blocks until every line
   queued before the call has been processed by the worker (written, or
   discarded if disabled in the meantime), or returns `ctx.Err()` if `ctx`
