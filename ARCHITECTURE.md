@@ -54,7 +54,8 @@ modes. Details and rationale: [internal/clock/README.md](internal/clock/README.m
   disableable, asynchronous stdout writer (own background worker + queue,
   with a `Flush` for graceful handoffs/shutdown).
 - [internal/textmode](internal/textmode/README.md) — raw-mode, single-key
-  console input (space / q / Q / Ctrl-C / external switch signal).
+  console input (space / q / Q / Ctrl-C / external switch signal). The only
+  package with OS-specific implementations (Linux/macOS vs. Windows).
 - [internal/tui](internal/tui/README.md) — the tview-based full-screen UI.
 - [internal/app](internal/app/README.md) — wires everything together:
   shared app startup, plain console mode, and the `--ui` mode-switching
