@@ -30,6 +30,25 @@ into the rest of the app.
   waiting for the worker to reach it — relies on `Run` having been
   started.
 
+## Logging methods (migrated from kpx)
+
+Two more files in this package add formatted logging on top of `Printer`,
+ported from kpx's `log.go`. Both go through `Println` like everything
+else, so log lines share the same async/toggleable behavior as the
+clock's output — no separate logging library or lifecycle (kpx's
+`logInit`/`logDestroy`/`logWriter`/`logFlush`) is needed here: `New`/`Run`
+and `Enable`/`Disable`/`Flush` already cover that.
+
+- `logger.go` — general-purpose formatted logging: `(*Printer).Printf`,
+  `Infof`, `Errorf`, `Fatalf` (which logs then calls `os.Exit(1)`). Each
+  prefixes a timestamp and queues the result via `Println`.
+- `request.go` — request/trace-specific logging, kept separate from the
+  general-purpose methods above because it's only meaningful while
+  processing a request: `traceInfo`/`newTraceInfo` tag a request with an
+  id and stage name, `(*Printer).Tracef` logs a line tagged with one, and
+  `(*Printer).Header` logs an HTTP header while redacting
+  `Proxy-Authorization` values down to a short prefix.
+
 The clock (see [../clock/README.md](../clock/README.md)) always calls
 `Printer.Println` on every tick, whether or not output is actually
 visible — the printer, not the caller, decides. This is what lets

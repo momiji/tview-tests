@@ -12,3 +12,32 @@
 - Do not run the app yourself to test it (e.g. via pty/python harnesses).
   The user runs it manually (it's an interactive TUI) and reports results.
   Stick to `go build`/`go vet` to confirm it compiles.
+
+## Migrating from kpx/
+
+`kpx/` is legacy source being ported into this project's `internal/`
+layout one file (or one logical class/concern) at a time. For each item,
+follow this two-phase process — do not skip straight to copying code:
+
+1. **Propose a split, then stop and wait for validation.** Before writing
+   any code, read the source file and present:
+   - Which destination package(s)/file(s) each piece of functionality
+     should land in — an existing package extended with a new file, a new
+     package, or a new file alongside an existing one (e.g. a `request.go`
+     next to a `printer.go` when one file mixes two concerns).
+   - Which methods/types map to which destination, named explicitly.
+   - Which methods are candidates to drop entirely because the new
+     architecture already covers them (e.g. manual `*Init`/`*Destroy`/
+     lifecycle plumbing that's superseded by this project's
+     context-cancellation-based shutdown), and why.
+   - Do not write or move any code in this step — text only, then ask the
+     user to confirm or adjust the split.
+2. **Once approved, copy with minimal transformation.** Port the
+   validated pieces largely as-is (logic, structure, names) into their new
+   home — adapt only what's mechanically required to fit the destination
+   (package name, imports, adapting to this project's existing types like
+   `Printer` instead of re-inventing them). Resist the urge to redesign,
+   rename for style, or clean up while moving; that's a separate, later
+   step if wanted. Update the destination package's `README.md` (and
+   `ARCHITECTURE.md` if the split adds/removes a package) per the
+   documentation rule above.

@@ -89,4 +89,6 @@ know about modes. Details and rationale:
   the UI to pull.
 - [internal/service/printer](internal/service/printer/README.md) — the
   dedicated, disableable, asynchronous stdout writer (own background
-  worker + queue, with a `Flush` for graceful handoffs/shutdown).
+  worker + queue, with a `Flush` for graceful handoffs/shutdown), plus
+  formatted/request-trace logging methods built on top of it (migrated
+  from kpx).
