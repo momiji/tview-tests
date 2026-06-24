@@ -1,11 +1,19 @@
 package app
 
 import (
+	"context"
 	"fmt"
+	"time"
 
 	"test/internal/textmode"
 	"test/internal/tui"
 )
+
+// preUIFlushTimeout bounds how long RunUI waits for the printer to drain
+// already-queued lines before handing the screen over to tview. It's a
+// best-effort cleanliness step (avoids the last console line racing with
+// tview's screen setup), not correctness-critical, hence the short cap.
+const preUIFlushTimeout = 200 * time.Millisecond
 
 // RunUI drives --ui mode on top of an already-started App (see Start). It
 // starts in text mode and switches to the tview UI as soon as either the
@@ -29,6 +37,7 @@ func RunUI(a *App, autoSwitch <-chan struct{}) error {
 
 	for {
 		a.Printer.Disable()
+		flushBeforeUI(a)
 		uiSig, err := tui.Run(a.Clock)
 		if err != nil {
 			return err
@@ -49,4 +58,13 @@ func RunUI(a *App, autoSwitch <-chan struct{}) error {
 		}
 		// User pressed space in text mode: loop back into UI mode.
 	}
+}
+
+// flushBeforeUI waits, briefly, for any already-queued printer lines to be
+// written before tview takes over the screen. Best-effort: if it doesn't
+// finish within preUIFlushTimeout, RunUI proceeds anyway.
+func flushBeforeUI(a *App) {
+	ctx, cancel := context.WithTimeout(context.Background(), preUIFlushTimeout)
+	defer cancel()
+	a.Printer.Flush(ctx)
 }

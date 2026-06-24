@@ -20,10 +20,9 @@ func main() {
 	flag.Parse()
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
-	defer cancel()
-
 	a := app.Start(ctx)
 
+	var runErr error
 	if *uiMode {
 		// autoSwitch simulates a trigger external to app.RunUI that asks
 		// it to move from text mode to UI mode; here it's just a timer,
@@ -32,12 +31,19 @@ func main() {
 		autoSwitch := make(chan struct{})
 		time.AfterFunc(startupTextDuration, func() { close(autoSwitch) })
 
-		if err := app.RunUI(a, autoSwitch); err != nil {
-			fmt.Fprintln(os.Stderr, "error:", err)
-			os.Exit(1)
-		}
-		return
+		runErr = app.RunUI(a, autoSwitch)
+	} else {
+		a.RunConsole(ctx)
 	}
 
-	a.RunConsole(ctx)
+	// Stop the clock/printer workers and wait for the printer to finish
+	// writing anything still queued, so output isn't lost when the process
+	// exits right after this.
+	cancel()
+	a.Wait()
+
+	if runErr != nil {
+		fmt.Fprintln(os.Stderr, "error:", runErr)
+		os.Exit(1)
+	}
 }

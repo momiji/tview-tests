@@ -51,7 +51,8 @@ modes. Details and rationale: [internal/clock/README.md](internal/clock/README.m
 - [internal/clock](internal/clock/README.md) — owns and refreshes the
   current time, pushing it to a printer and exposing it for the UI to pull.
 - [internal/printer](internal/printer/README.md) — the dedicated,
-  disableable stdout writer.
+  disableable, asynchronous stdout writer (own background worker + queue,
+  with a `Flush` for graceful handoffs/shutdown).
 - [internal/textmode](internal/textmode/README.md) — raw-mode, single-key
   console input (space / q / Q / Ctrl-C / external switch signal).
 - [internal/tui](internal/tui/README.md) — the tview-based full-screen UI.

@@ -5,6 +5,7 @@ package app
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"test/internal/clock"
@@ -18,18 +19,39 @@ const tickInterval = 500 * time.Millisecond
 type App struct {
 	Clock   *clock.Clock
 	Printer *printer.Printer
+
+	wg sync.WaitGroup
 }
 
-// Start creates the clock and printer and starts the clock ticking (and
-// printing through Printer) in the background until ctx is cancelled. It
-// returns immediately; the caller decides afterwards whether to layer a UI
-// on top (RunUI, in ui.go) or just let it run as plain console mode
-// (RunConsole, below).
+// Start creates the clock and printer and starts both running in the
+// background until ctx is cancelled: the clock ticking (and queuing lines
+// through Printer), and the printer's own worker actually writing them to
+// stdout. It returns immediately; the caller decides afterwards whether to
+// layer a UI on top (RunUI, in ui.go) or just let it run as plain console
+// mode (RunConsole, below). Call Wait after cancelling ctx to make sure
+// both have fully stopped (and the printer has drained) before exiting.
 func Start(ctx context.Context) *App {
 	clk := clock.New(tickInterval)
 	p := printer.New()
-	go clk.Run(ctx, p)
-	return &App{Clock: clk, Printer: p}
+
+	a := &App{Clock: clk, Printer: p}
+	a.wg.Add(2)
+	go func() {
+		defer a.wg.Done()
+		p.Run(ctx)
+	}()
+	go func() {
+		defer a.wg.Done()
+		clk.Run(ctx, p)
+	}()
+	return a
+}
+
+// Wait blocks until the background clock and printer workers started by
+// Start have both exited. ctx must already be cancelled (or about to be)
+// for this to return — otherwise it blocks forever.
+func (a *App) Wait() {
+	a.wg.Wait()
 }
 
 // RunConsole is plain-console mode. Start already has the clock printing
