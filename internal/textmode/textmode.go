@@ -6,6 +6,7 @@ package textmode
 import (
 	"os"
 
+	"golang.org/x/sys/unix"
 	"golang.org/x/term"
 )
 
@@ -13,18 +14,32 @@ import (
 type Signal int
 
 const (
-	// SwitchToUI means the user pressed space and wants the tview UI.
+	// SwitchToUI means something asked to move to the tview UI: either the
+	// user pressed space, or switchSignal (see Run) fired.
 	SwitchToUI Signal = iota
 	// Quit means the user pressed q/Q/Ctrl-C.
 	Quit
 )
 
-// Run puts stdin into raw mode and blocks, reading one key at a time, until
-// the user presses space (SwitchToUI) or q/Q/Ctrl-C (Quit). The terminal is
-// always restored to its previous state before Run returns, and normal
-// stdout output (e.g. from a printer.Printer) keeps scrolling normally
-// while this runs.
-func Run() (Signal, error) {
+// pollInterval bounds how quickly Run notices that switchSignal fired,
+// since that channel can only be checked in between poll() calls.
+const pollInterval = 100 // milliseconds
+
+// Run puts stdin into raw mode and reads one key at a time until the user
+// presses space, or until switchSignal fires — both return SwitchToUI.
+// switchSignal lets some other part of the program request the switch
+// asynchronously (e.g. an automatic startup timer); pass nil to disable it
+// and only react to keypresses. q/Q/Ctrl-C always return Quit.
+//
+// Waiting is done with a poll loop (rather than a single blocking Read) so
+// switchSignal can be checked regularly and so that, on return, there is no
+// goroutine left blocked on stdin — the next caller can safely read from
+// stdin again without racing this one.
+//
+// The terminal is always restored to its previous state before Run
+// returns, and normal stdout output (e.g. from a printer.Printer) keeps
+// scrolling normally while this runs.
+func Run(switchSignal <-chan struct{}) (Signal, error) {
 	fd := int(os.Stdin.Fd())
 	oldState, err := term.MakeRaw(fd)
 	if err != nil {
@@ -34,8 +49,26 @@ func Run() (Signal, error) {
 
 	buf := make([]byte, 1)
 	for {
-		n, err := os.Stdin.Read(buf)
-		if err != nil || n == 0 {
+		select {
+		case <-switchSignal:
+			return SwitchToUI, nil
+		default:
+		}
+
+		fds := []unix.PollFd{{Fd: int32(fd), Events: unix.POLLIN}}
+		n, err := unix.Poll(fds, pollInterval)
+		if err != nil {
+			if err == unix.EINTR {
+				continue
+			}
+			return Quit, err
+		}
+		if n == 0 {
+			continue // poll timed out; loop around to recheck switchSignal
+		}
+
+		nRead, err := os.Stdin.Read(buf)
+		if err != nil || nRead == 0 {
 			return Quit, err
 		}
 		switch buf[0] {
