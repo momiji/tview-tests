@@ -85,22 +85,30 @@ decoupled from the clock's tick interval.
   tears down the tview/tcell screen (restoring the terminal) before `Run`
   returns.
 
-- **`internal/app`** — orchestrates the two top-level entry points:
-  - `RunConsole(ctx)`: the original plain-console behavior — `clk.Run(ctx,
-    p)` directly, printing forever until `ctx` is cancelled (Ctrl-C).
-  - `RunUI(ctx, autoSwitch <-chan struct{})`: starts `clk.Run(ctx, p)` in
-    the background, then enters text mode via `textmode.Run(autoSwitch)`.
-    Once that first switch happens (by keypress or `autoSwitch`), it loops
-    calling `tui.Run` and `textmode.Run(nil)` alternately based on which
-    `Signal` each one returns (`SwitchToText`/`SwitchToUI` or `Quit`),
-    enabling/disabling the printer to match whichever mode is currently
-    active. `RunUI` itself has no notion of *why* or *when* `autoSwitch`
-    fires — that's entirely up to the caller.
+- **`internal/app`** is split into two files so application logic and UI
+  logic don't mix, and so the clock/printer are only ever created once:
+  - **`app.go`** — `App` holds the shared `Clock` and `Printer`.
+    `Start(ctx)` creates them and starts `clk.Run(ctx, p)` in the
+    background, returning immediately; both `RunConsole` and `RunUI` build
+    on the same `*App` instead of each setting up their own clock and
+    printer. `(*App).RunConsole(ctx)` is plain-console mode: since `Start`
+    already has the clock printing in the background, all it has to do is
+    block on `<-ctx.Done()` (Ctrl-C).
+  - **`ui.go`** — `RunUI(a *App, autoSwitch <-chan struct{})` is all of the
+    `--ui` mode-switching logic: it enters text mode via
+    `textmode.Run(autoSwitch)`, and once that first switch happens (by
+    keypress or `autoSwitch`), loops calling `tui.Run(a.Clock)` and
+    `textmode.Run(nil)` alternately based on which `Signal` each one
+    returns (`SwitchToText`/`SwitchToUI` or `Quit`), enabling/disabling
+    `a.Printer` to match whichever mode is currently active. `RunUI` itself
+    has no notion of *why* or *when* `autoSwitch` fires — that's entirely
+    up to the caller.
 
 - **`main.go`** — parses the `--ui` flag and a `signal.NotifyContext` for
-  Ctrl-C, then dispatches to `app.RunConsole` or `app.RunUI`. For `--ui`,
-  it also owns the "external auto-switch trigger" channel (see below) and
-  passes it into `app.RunUI`.
+  Ctrl-C, calls `app.Start(ctx)` to get the shared `*App`, and only then
+  decides what to do with it: if `--ui`, it builds the "external
+  auto-switch trigger" channel (see below) and calls `app.RunUI(a,
+  autoSwitch)`; otherwise it calls `a.RunConsole(ctx)`.
 
 ## External auto-switch trigger
 

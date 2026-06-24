@@ -22,6 +22,8 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
+	a := app.Start(ctx)
+
 	if *uiMode {
 		// autoSwitch simulates a trigger external to app.RunUI that asks
 		// it to move from text mode to UI mode; here it's just a timer,
@@ -30,12 +32,12 @@ func main() {
 		autoSwitch := make(chan struct{})
 		time.AfterFunc(startupTextDuration, func() { close(autoSwitch) })
 
-		if err := app.RunUI(ctx, autoSwitch); err != nil {
+		if err := app.RunUI(a, autoSwitch); err != nil {
 			fmt.Fprintln(os.Stderr, "error:", err)
 			os.Exit(1)
 		}
 		return
 	}
 
-	app.RunConsole(ctx)
+	a.RunConsole(ctx)
 }
