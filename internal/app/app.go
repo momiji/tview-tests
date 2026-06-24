@@ -14,7 +14,7 @@ import (
 )
 
 // tickInterval is how often the current time is refreshed and printed.
-const tickInterval = 2 * time.Second
+const tickInterval = 500 * time.Millisecond
 
 // RunConsole is plain-console mode: print the current time every tick
 // until ctx is cancelled (e.g. Ctrl-C).

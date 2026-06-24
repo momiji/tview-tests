@@ -58,4 +58,5 @@ func (c *Clock) update(p *printer.Printer) {
 	c.now = time.Now()
 	c.mu.Unlock()
 	p.Println(c.Now().Format(Format))
+	p.Println("This is a very long line that should wrap around the screen and be printed on multiple lines so that we can test the text wrapping functionality of the printer and ensure that it behaves correctly when dealing with long strings of text that exceed the width of the terminal window.")
 }

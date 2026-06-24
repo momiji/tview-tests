@@ -47,6 +47,16 @@ func Run(switchSignal <-chan struct{}) (Signal, error) {
 	}
 	defer term.Restore(fd, oldState)
 
+	// term.MakeRaw also disables output post-processing (OPOST/ONLCR), so a
+	// plain '\n' from the printer would no longer be translated to '\r\n'
+	// and output would "stair-step" down the screen. Put that back: we only
+	// need raw *input* (no line buffering/echo, and no ISIG so Ctrl-C
+	// reaches us as a byte instead of a signal), not raw output.
+	if t, err := unix.IoctlGetTermios(fd, unix.TCGETS); err == nil {
+		t.Oflag |= unix.OPOST | unix.ONLCR
+		unix.IoctlSetTermios(fd, unix.TCSETS, t)
+	}
+
 	buf := make([]byte, 1)
 	for {
 		select {
