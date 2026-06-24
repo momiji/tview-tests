@@ -1,10 +1,10 @@
-# internal/textmode
+# internal/ui/textmode
 
 Reads single keypresses from the terminal without requiring Enter, so the
 plain-console side of `--ui` mode can react to spacebar and quit keys while
 still behaving like a normal scrolling console. See
-[../../ARCHITECTURE.md](../../ARCHITECTURE.md) for how this fits into the
-rest of the app.
+[../../../ARCHITECTURE.md](../../../ARCHITECTURE.md) for how this fits
+into the rest of the app.
 
 ## API
 
@@ -17,8 +17,8 @@ rest of the app.
 
 `switchSignal` lets some other part of the program request the switch
 asynchronously (e.g. an automatic startup timer owned by `main.go` — see
-[../app/README.md](../app/README.md)); `Run` treats it exactly like a
-spacebar press and has no notion of why or when it fires.
+[../README.md](../README.md)); `Run` treats it exactly like a spacebar
+press and has no notion of why or when it fires.
 
 ## Per-OS implementations
 

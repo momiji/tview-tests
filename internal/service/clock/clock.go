@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"test/internal/printer"
+	"test/internal/service/printer"
 )
 
 // Format is the layout used to render the time everywhere in the app.

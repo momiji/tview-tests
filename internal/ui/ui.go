@@ -1,12 +1,14 @@
-package app
+package ui
 
 import (
 	"context"
 	"fmt"
 	"time"
 
-	"test/internal/textmode"
-	"test/internal/tui"
+	"test/internal/service/clock"
+	"test/internal/service/printer"
+	"test/internal/ui/textmode"
+	"test/internal/ui/tui"
 )
 
 // preUIFlushTimeout bounds how long RunUI waits for the printer to drain
@@ -15,16 +17,16 @@ import (
 // tview's screen setup), not correctness-critical, hence the short cap.
 const preUIFlushTimeout = 200 * time.Millisecond
 
-// RunUI drives --ui mode on top of an already-started App (see Start). It
-// starts in text mode and switches to the tview UI as soon as either the
-// user presses space or autoSwitch fires — autoSwitch is owned and
-// triggered by the caller, e.g. on a startup timer, so RunUI itself has no
-// notion of why or when that happens. After the first switch, the user can
-// keep toggling between text and UI mode with the spacebar. Pressing
-// q/Q/Ctrl-C quits from either mode; because tview's Stop() and
-// textmode's terminal restore both run before this function returns, the
-// terminal is always left back in plain console state.
-func RunUI(a *App, autoSwitch <-chan struct{}) error {
+// RunUI drives --ui mode on top of an already-started clock and printer
+// (see app.Start). It starts in text mode and switches to the tview UI as
+// soon as either the user presses space or autoSwitch fires — autoSwitch
+// is owned and triggered by the caller, e.g. on a startup timer, so RunUI
+// itself has no notion of why or when that happens. After the first
+// switch, the user can keep toggling between text and UI mode with the
+// spacebar. Pressing q/Q/Ctrl-C quits from either mode; because tview's
+// Stop() and textmode's terminal restore both run before this function
+// returns, the terminal is always left back in plain console state.
+func RunUI(clk *clock.Clock, p *printer.Printer, autoSwitch <-chan struct{}) error {
 	fmt.Println("tview-tests --ui: starting in text mode, switching to UI mode automatically or on space...")
 
 	sig, err := textmode.Run(autoSwitch)
@@ -36,9 +38,9 @@ func RunUI(a *App, autoSwitch <-chan struct{}) error {
 	}
 
 	for {
-		a.Printer.Disable()
-		flushBeforeUI(a)
-		uiSig, err := tui.Run(a.Clock)
+		p.Disable()
+		flushBeforeUI(p)
+		uiSig, err := tui.Run(clk)
 		if err != nil {
 			return err
 		}
@@ -48,7 +50,7 @@ func RunUI(a *App, autoSwitch <-chan struct{}) error {
 
 		// User pressed space in the UI: back to text mode. No automatic
 		// switch trigger here — only a keypress brings it back to the UI.
-		a.Printer.Enable()
+		p.Enable()
 		textSig, err := textmode.Run(nil)
 		if err != nil {
 			return err
@@ -63,8 +65,8 @@ func RunUI(a *App, autoSwitch <-chan struct{}) error {
 // flushBeforeUI waits, briefly, for any already-queued printer lines to be
 // written before tview takes over the screen. Best-effort: if it doesn't
 // finish within preUIFlushTimeout, RunUI proceeds anyway.
-func flushBeforeUI(a *App) {
+func flushBeforeUI(p *printer.Printer) {
 	ctx, cancel := context.WithTimeout(context.Background(), preUIFlushTimeout)
 	defer cancel()
-	a.Printer.Flush(ctx)
+	p.Flush(ctx)
 }

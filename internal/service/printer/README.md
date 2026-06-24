@@ -1,8 +1,8 @@
-# internal/printer
+# internal/service/printer
 
 The dedicated, disableable, **asynchronous** stdout writer. See
-[../../ARCHITECTURE.md](../../ARCHITECTURE.md) for how this fits into the
-rest of the app.
+[../../../ARCHITECTURE.md](../../../ARCHITECTURE.md) for how this fits
+into the rest of the app.
 
 ## API
 
@@ -33,9 +33,9 @@ rest of the app.
 The clock (see [../clock/README.md](../clock/README.md)) always calls
 `Printer.Println` on every tick, whether or not output is actually
 visible — the printer, not the caller, decides. This is what lets
-[../app/README.md](../app/README.md) silence plain-console output while
-the tview UI is showing, and re-enable it when switching back, without the
-clock's own logic ever branching on mode.
+[../../ui/README.md](../../ui/README.md) silence plain-console output
+while the tview UI is showing, and re-enable it when switching back,
+without the clock's own logic ever branching on mode.
 
 ## Why asynchronous?
 
@@ -44,6 +44,6 @@ synchronously, a slow or blocked terminal would stall the clock itself.
 Queuing the line and handing the actual `fmt.Print` off to `Run`'s own
 goroutine decouples "the value changed" from "the value got written
 somewhere," the same way `Clock.Now()` decouples "the value changed" from
-"the UI redrew." See [../app/README.md](../app/README.md) for how `Start`
-runs `Printer.Run` and `Clock.Run` side by side, and how shutdown waits for
-both to fully drain before the process exits.
+"the UI redrew." See [../../app/README.md](../../app/README.md) for how
+`Start` runs `Printer.Run` and `Clock.Run` side by side, and how shutdown
+waits for both to fully drain before the process exits.

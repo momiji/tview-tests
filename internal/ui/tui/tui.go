@@ -10,7 +10,7 @@ import (
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 
-	"test/internal/clock"
+	"test/internal/service/clock"
 )
 
 // Signal is the reason Run returned.

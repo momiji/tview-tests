@@ -1,8 +1,8 @@
-# internal/tui
+# internal/ui/tui
 
 The tview-based full-screen UI. See
-[../../ARCHITECTURE.md](../../ARCHITECTURE.md) for how this fits into the
-rest of the app.
+[../../../ARCHITECTURE.md](../../../ARCHITECTURE.md) for how this fits
+into the rest of the app.
 
 ## API
 
@@ -13,7 +13,8 @@ rest of the app.
 ## Implementation notes
 
 - The view is redrawn by its own `refreshInterval` ticker (500ms) that
-  calls `clk.Now()` (see [../clock/README.md](../clock/README.md)) and
+  calls `clk.Now()` (see
+  [../../service/clock/README.md](../../service/clock/README.md)) and
   pushes the result into the view via `QueueUpdateDraw`. This polling loop
   is local to `Run` and stops as soon as it returns — `tui` pulls from the
   clock rather than being pushed to, on whatever cadence makes the screen

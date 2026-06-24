@@ -1,8 +1,8 @@
-# internal/clock
+# internal/service/clock
 
 Owns the application's core value: the current time, refreshed on a fixed
-interval. See [../../ARCHITECTURE.md](../../ARCHITECTURE.md) for how this
-fits into the rest of the app.
+interval. See [../../../ARCHITECTURE.md](../../../ARCHITECTURE.md) for how
+this fits into the rest of the app.
 
 ## API
 
@@ -23,9 +23,10 @@ value, prints it, and lets anyone else read it.
 
 The printer is meant to mirror exactly what the clock logic produces, at
 the clock's own cadence, so the clock pushes to it directly inside `Run`.
-The UI (see [../tui/README.md](../tui/README.md)), on the other hand, wants
-to redraw at whatever cadence makes the screen feel responsive (and only
-while it's actually on screen), which has nothing to do with how often the
-underlying value changes — so it pulls via `Now()` on its own ticker
-instead of being pushed to. This keeps `Clock` simple (no subscriber
-bookkeeping) while letting each consumer pick the cadence that suits it.
+The UI (see [../../ui/tui/README.md](../../ui/tui/README.md)), on the
+other hand, wants to redraw at whatever cadence makes the screen feel
+responsive (and only while it's actually on screen), which has nothing to
+do with how often the underlying value changes — so it pulls via `Now()`
+on its own ticker instead of being pushed to. This keeps `Clock` simple
+(no subscriber bookkeeping) while letting each consumer pick the cadence
+that suits it.

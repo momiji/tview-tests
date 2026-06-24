@@ -1,6 +1,7 @@
-// Package app centralizes the application's runtime: the clock and
-// printer that both plain console mode and UI mode (see ui.go) are built
-// on top of, created exactly once regardless of which mode is used.
+// Package app is the orchestrator: it creates the shared components
+// (clock, printer), starts them, picks which UI mode to run on top of
+// them, and waits for clean termination. See internal/ui for what "UI
+// mode" actually means.
 package app
 
 import (
@@ -8,8 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"test/internal/clock"
-	"test/internal/printer"
+	"test/internal/service/clock"
+	"test/internal/service/printer"
+	"test/internal/ui"
 )
 
 // tickInterval is how often the current time is refreshed and printed.
@@ -26,10 +28,9 @@ type App struct {
 // Start creates the clock and printer and starts both running in the
 // background until ctx is cancelled: the clock ticking (and queuing lines
 // through Printer), and the printer's own worker actually writing them to
-// stdout. It returns immediately; the caller decides afterwards whether to
-// layer a UI on top (RunUI, in ui.go) or just let it run as plain console
-// mode (RunConsole, below). Call Wait after cancelling ctx to make sure
-// both have fully stopped (and the printer has drained) before exiting.
+// stdout. It returns immediately; call Run afterwards to pick a mode, and
+// Wait (after cancelling ctx) to make sure both have fully stopped (and
+// the printer has drained) before exiting.
 func Start(ctx context.Context) *App {
 	clk := clock.New(tickInterval)
 	p := printer.New()
@@ -54,9 +55,13 @@ func (a *App) Wait() {
 	a.wg.Wait()
 }
 
-// RunConsole is plain-console mode. Start already has the clock printing
-// in the background, so there is nothing left to do but wait for ctx to be
-// cancelled (e.g. Ctrl-C).
-func (a *App) RunConsole(ctx context.Context) {
-	<-ctx.Done()
+// Run picks and runs a single UI mode to completion: ui.RunUI if uiMode is
+// set, otherwise ui.RunConsole. autoSwitch is only used in UI mode; pass
+// nil when uiMode is false.
+func (a *App) Run(ctx context.Context, uiMode bool, autoSwitch <-chan struct{}) error {
+	if uiMode {
+		return ui.RunUI(a.Clock, a.Printer, autoSwitch)
+	}
+	ui.RunConsole(ctx)
+	return nil
 }
