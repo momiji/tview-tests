@@ -1,0 +1,58 @@
+# internal/app
+
+Wires the clock, printer, text mode, and tview UI together. Split into two
+files so application logic and UI logic don't mix, and so the clock and
+printer are only ever created once. See
+[../../ARCHITECTURE.md](../../ARCHITECTURE.md) for how this fits into the
+rest of the app.
+
+## `app.go` — shared startup and plain console mode
+
+- `App` holds the shared `Clock` (see
+  [../clock/README.md](../clock/README.md)) and `Printer` (see
+  [../printer/README.md](../printer/README.md)).
+- `Start(ctx context.Context) *App` — creates them and starts
+  `clk.Run(ctx, p)` in the background, returning immediately. Both
+  `RunConsole` and `RunUI` build on the same `*App` instead of each setting
+  up their own clock and printer.
+- `(*App).RunConsole(ctx context.Context)` — plain-console mode. Since
+  `Start` already has the clock printing in the background, all this does
+  is block on `<-ctx.Done()` (Ctrl-C).
+
+## `ui.go` — the `--ui` mode-switching loop
+
+- `RunUI(a *App, autoSwitch <-chan struct{}) error` is all of the `--ui`
+  mode-switching logic:
+  1. Enters text mode via `textmode.Run(autoSwitch)` (see
+     [../textmode/README.md](../textmode/README.md)).
+  2. Once that first switch happens (by keypress or `autoSwitch`), loops
+     calling `tui.Run(a.Clock)` (see [../tui/README.md](../tui/README.md))
+     and `textmode.Run(nil)` alternately, based on which `Signal` each one
+     returns (`SwitchToText`/`SwitchToUI` or `Quit`), enabling/disabling
+     `a.Printer` to match whichever mode is currently active.
+
+  `RunUI` itself has no notion of *why* or *when* `autoSwitch` fires —
+  that's entirely up to the caller.
+
+## How `main.go` drives this
+
+`main.go` parses the `--ui` flag and a `signal.NotifyContext` for Ctrl-C,
+calls `app.Start(ctx)` to get the shared `*App`, and only then decides what
+to do with it: if `--ui`, it builds the external auto-switch trigger (below)
+and calls `app.RunUI(a, autoSwitch)`; otherwise it calls `a.RunConsole(ctx)`.
+
+## External auto-switch trigger
+
+`RunUI` doesn't have a "switch to UI after N seconds" feature built in.
+Instead it takes an `autoSwitch <-chan struct{}` parameter and treats it
+exactly like a spacebar press: closing it asks for an immediate switch to
+UI mode, whenever that happens. `main.go` is the one piece of code that
+actually decides *when*: it creates the channel and calls
+`time.AfterFunc(3*time.Second, func() { close(autoSwitch) })` before
+calling `RunUI`.
+
+This keeps the "switch after 3 seconds on startup" policy out of `app` and
+`textmode` entirely — they only know about a generic external signal. In
+this app that signal happens to be a timer, but it stands in for any other
+real-world trigger (e.g. an event from elsewhere in a larger program) that
+might want to force the UI open without the user pressing space.
