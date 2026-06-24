@@ -13,8 +13,10 @@ import (
 )
 
 // queueSize bounds how many not-yet-written lines can be buffered. Once
-// full, Println drops the line rather than blocking the caller.
-const queueSize = 256
+// full, Println drops the line rather than blocking the caller. Sized for
+// bursts of per-request trace logging, not just the clock's one-line-every-
+// 2s ticks.
+const queueSize = 1024
 
 // job is either a line to write, a flush request (ack set, line empty), or
 // both unset (never produced, but harmless if it were).
@@ -46,7 +48,12 @@ func (p *Printer) Enable() {
 // Disable suppresses output: subsequent Println calls won't queue anything
 // new, and any lines already queued (from before Disable was called) are
 // discarded by the worker instead of being written, so disabling always
-// takes effect immediately rather than after a backlog drains.
+// takes effect immediately rather than after a backlog drains. Because
+// write() checks p.enabled under the same lock it holds while actually
+// printing, no line can be printed once this call returns: any write()
+// already mid-print finishes (and was already committed to printing)
+// before this can acquire the lock, and any write() that acquires the
+// lock afterwards is guaranteed to see enabled == false.
 func (p *Printer) Disable() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -95,12 +102,13 @@ func (p *Printer) drain() {
 	}
 }
 
+// write prints j's line, unless the printer is disabled. The check and the
+// print happen under the same lock Disable() takes, so that once Disable()
+// returns no line can be printed after it — see the comment on Disable.
 func (p *Printer) write(j job) {
 	p.mu.Lock()
-	enabled := p.enabled
-	p.mu.Unlock()
-
-	if enabled && j.line != "" {
+	defer p.mu.Unlock()
+	if p.enabled && j.line != "" {
 		fmt.Print(j.line)
 	}
 	if j.ack != nil {

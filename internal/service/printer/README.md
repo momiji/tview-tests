@@ -19,10 +19,16 @@ into the rest of the app.
   already queued from before `Disable` was called. Without that second
   part, a backlog queued while enabled would still leak out after
   disabling, just delayed — which would defeat the point of disabling.
+  `write()` checks `enabled` under the same mutex `Disable` takes, and
+  holds that mutex for the actual `fmt.Print` too — not just the read —
+  so once `Disable()` returns, no line can still be mid-print with a
+  stale "enabled" value (an earlier version checked-then-unlocked before
+  printing, which left exactly that race open).
 - `(*Printer).Println(a ...any)` — formats a line and enqueues it for the
   worker to write; a no-op when disabled. Never blocks on I/O: if the
-  internal queue (`queueSize`, currently 256) is full, the line is dropped
-  rather than stalling the caller.
+  internal queue (`queueSize`, currently 1024 — sized for bursts of
+  per-request trace logging, not just the clock's one-line-every-2s
+  ticks) is full, the line is dropped rather than stalling the caller.
 - `(*Printer).Flush(ctx context.Context) error` — blocks until every line
   queued before the call has been processed by the worker (written, or
   discarded if disabled in the meantime), or returns `ctx.Err()` if `ctx`
