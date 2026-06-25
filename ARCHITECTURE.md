@@ -114,3 +114,6 @@ know about modes. Details and rationale:
   connection helpers: TCP tuning (`ConfigureConn`), a byte-counting
   `TrafficConn` (metered through a UI-agnostic `TrafficMeter` port), and an
   instrumented HTTP "chunked" reader/writer.
+- [internal/proxy/message](internal/proxy/message/README.md) — reads, parses
+  and writes the raw HTTP messages (`ProxyRequest` / `RequestHeader`),
+  keeping header lines verbatim for faithful forwarding.

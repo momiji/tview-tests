@@ -73,3 +73,14 @@ port is stabilized.
   bound the request-header read with a one-shot
   `conn.SetReadDeadline(now + connectTimeout)` (the replacement for the
   dropped `TimedConn`); make sure it is cleared afterwards.
+
+## internal/proxy/message (step 6, from kpx/request.go)
+
+- **Export surface is provisional.** The read/write methods and all
+  `RequestHeader` fields were exported so the (not-yet-migrated) processor
+  can use them. Revisit once the processor lands: tighten what does not need
+  to be public, and consider getters over exported mutable fields.
+- **`splitHostPort` duplicated** (config, kerberos, message). Fold into a
+  shared util at the CLI step.
+- **Mixed pointer/value receivers** kept from the original; the value
+  receivers on the write methods are harmless (no mutation) but inconsistent.
