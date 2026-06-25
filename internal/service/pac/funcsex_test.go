@@ -8,6 +8,7 @@ import (
 )
 
 func TestIsInNetEx(t *testing.T) {
+	p := testExecutor()
 	cases := []struct {
 		name      string
 		ipAddress string
@@ -23,7 +24,7 @@ func TestIsInNetEx(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if got := isInNetEx(c.ipAddress, c.ipPrefix); got != c.want {
+			if got := p.isInNetEx(c.ipAddress, c.ipPrefix); got != c.want {
 				t.Errorf("isInNetEx(%q, %q) = %v, want %v", c.ipAddress, c.ipPrefix, got, c.want)
 			}
 		})
@@ -31,7 +32,8 @@ func TestIsInNetEx(t *testing.T) {
 }
 
 func TestMyIpAddressEx(t *testing.T) {
-	got := myIpAddressEx()
+	p := testExecutor()
+	got := p.myIpAddressEx()
 	if got == "" {
 		t.Fatal("myIpAddressEx() returned empty string")
 	}
@@ -43,26 +45,26 @@ func TestMyIpAddressEx(t *testing.T) {
 }
 
 func TestDnsResolveExAndIsResolvableEx(t *testing.T) {
-	const timeout = 2 * time.Second
+	p := &PacExecutor{dnsTimeout: 2 * time.Second}
 
-	if !isResolvableEx("localhost", timeout) {
-		t.Error(`isResolvableEx("localhost", timeout) = false, want true`)
+	if !p.isResolvableEx("localhost") {
+		t.Error(`isResolvableEx("localhost") = false, want true`)
 	}
-	resolved := dnsResolveEx("localhost", timeout)
+	resolved := p.dnsResolveEx("localhost")
 	if resolved == "" {
-		t.Fatal(`dnsResolveEx("localhost", timeout) returned empty string`)
+		t.Fatal(`dnsResolveEx("localhost") returned empty string`)
 	}
 	for _, ip := range strings.Split(resolved, ";") {
 		if net.ParseIP(ip) == nil {
-			t.Errorf("dnsResolveEx(\"localhost\", timeout) returned invalid IP %q in %q", ip, resolved)
+			t.Errorf("dnsResolveEx(\"localhost\") returned invalid IP %q in %q", ip, resolved)
 		}
 	}
 
 	const badHost = "this-host-does-not-exist.invalid"
-	if isResolvableEx(badHost, timeout) {
-		t.Errorf("isResolvableEx(%q, timeout) = true, want false", badHost)
+	if p.isResolvableEx(badHost) {
+		t.Errorf("isResolvableEx(%q) = true, want false", badHost)
 	}
-	if got := dnsResolveEx(badHost, timeout); got != "" {
-		t.Errorf("dnsResolveEx(%q, timeout) = %q, want \"\"", badHost, got)
+	if got := p.dnsResolveEx(badHost); got != "" {
+		t.Errorf("dnsResolveEx(%q) = %q, want \"\"", badHost, got)
 	}
 }

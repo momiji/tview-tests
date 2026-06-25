@@ -47,15 +47,20 @@ functions](https://developer.mozilla.org/en-US/docs/Web/HTTP/Proxy_servers_and_t
 (`isPlainHostName`, `dnsDomainIs`, `shExpMatch`, `myIpAddress`, etc.) on
 the runtime so PAC scripts can call them. They're kept in their own file
 since they're a separate concern from the executor/pooling logic in
-`pac.go`: plain, mostly stateless string/network helpers with no
-knowledge of goja or `PacExecutor`.
+`pac.go`, but implemented as methods on `*PacExecutor` (`p.isResolvable`,
+`p.dnsResolve`, ...) rather than plain functions: most don't actually
+need `p`, but doing it this way means `build()` can register every
+builtin with a plain `runtime.Set("name", p.method)`, and the
+DNS-dependent ones (`isResolvable`, `dnsResolve`, `isInNet`) read
+`p.dnsTimeout` directly instead of needing a closure to capture it.
+`dayIndex` (used by `weekdayRange`) is the one plain helper function,
+since it isn't registered on the runtime itself.
 
-The DNS-dependent builtins (`isResolvable`, `dnsResolve`, `isInNet`) take
-a `timeout time.Duration` parameter — `build()` binds it from
-`PacExecutor.dnsTimeout` via a closure — so a slow or unresponsive DNS
-server can't hang script evaluation. `weekdayRange` supports all three
-PAC call forms (a single day, a single day with `"GMT"`, or a day range),
-since PAC scripts can call it with 1, 2, or 3 arguments.
+The DNS-dependent builtins bound their lookups by `p.dnsTimeout` (via the
+shared `p.lookupHost` helper), so a slow or unresponsive DNS server can't
+hang script evaluation. `weekdayRange` supports all three PAC call forms
+(a single day, a single day with `"GMT"`, or a day range), since PAC
+scripts can call it with 1, 2, or 3 arguments.
 
 ## IPv6 builtins: the "Ex" family (`funcsex.go`)
 
@@ -71,8 +76,8 @@ kept in its own file since it's a distinct (if overlapping) API surface:
   expected to already be an IP.
 - `dnsResolveEx(host)` / `isResolvableEx(host)` — like `dnsResolve` /
   `isResolvable`, but resolve to (or check for) *all* of a host's IPs,
-  v4 and v6, semicolon-separated. Bounded by the same
-  `PacOptions.DNSTimeout`.
+  v4 and v6, semicolon-separated. Bounded by the same `p.dnsTimeout`
+  (`PacOptions.DNSTimeout`).
 - `myIpAddressEx()` — like `myIpAddress`, but returns every non-loopback
   IP (v4 and v6) configured on the host's interfaces, semicolon
   separated, instead of just the one address the kernel would route

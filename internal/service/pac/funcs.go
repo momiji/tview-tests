@@ -10,42 +10,48 @@ import (
 )
 
 // https://developer.mozilla.org/en-US/docs/Web/HTTP/Proxy_servers_and_tunneling/Proxy_Auto-Configuration_(PAC)_file#isPlainHostName
+//
+// These are methods on *PacExecutor, rather than plain functions, purely
+// so build() can register them with runtime.Set directly (p.isResolvable
+// instead of a closure wrapping isResolvable(host, p.dnsTimeout)) — most
+// of them don't actually touch p.
 
-func isPlainHostName(host string) bool {
+func (p *PacExecutor) isPlainHostName(host string) bool {
 	return !strings.Contains(host, ".")
 }
-func dnsDomainIs(host, domain string) bool {
+func (p *PacExecutor) dnsDomainIs(host, domain string) bool {
 	return host == domain || strings.HasSuffix(host, "."+domain)
 }
-func localHostOrDomainIs(host, hostdom string) bool {
+func (p *PacExecutor) localHostOrDomainIs(host, hostdom string) bool {
 	return host == hostdom || (!strings.Contains(host, ".") && strings.HasPrefix(hostdom, host+"."))
 }
-func isResolvable(host string, timeout time.Duration) bool {
-	_, err := lookupHost(host, timeout)
+func (p *PacExecutor) isResolvable(host string) bool {
+	_, err := p.lookupHost(host)
 	return err == nil
 }
-func isInNet(host, pattern, mask string, timeout time.Duration) bool {
-	host = dnsResolve(host, timeout)
+func (p *PacExecutor) isInNet(host, pattern, mask string) bool {
+	host = p.dnsResolve(host)
 	if host == "" {
 		return false
 	}
-	hostInt := convert_addr(host)
-	patternInt := convert_addr(pattern)
-	maskInt := convert_addr(mask)
+	hostInt := p.convert_addr(host)
+	patternInt := p.convert_addr(pattern)
+	maskInt := p.convert_addr(mask)
 	return hostInt&maskInt == patternInt
 }
-func dnsResolve(host string, timeout time.Duration) string {
-	ips, err := lookupHost(host, timeout)
+func (p *PacExecutor) dnsResolve(host string) string {
+	ips, err := p.lookupHost(host)
 	if err != nil || len(ips) == 0 {
 		return ""
 	}
 	return ips[0]
 }
 
-// lookupHost bounds net.DefaultResolver.LookupHost with timeout, so a slow
-// or unresponsive DNS server can't hang a PAC script's evaluation forever.
-func lookupHost(host string, timeout time.Duration) ([]string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+// lookupHost bounds net.DefaultResolver.LookupHost with p.dnsTimeout, so a
+// slow or unresponsive DNS server can't hang a PAC script's evaluation
+// forever.
+func (p *PacExecutor) lookupHost(host string) ([]string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), p.dnsTimeout)
 	defer cancel()
 	return net.DefaultResolver.LookupHost(ctx, host)
 }
@@ -54,7 +60,7 @@ func lookupHost(host string, timeout time.Duration) ([]string, error) {
 // builtins (isInNet's pattern/mask are always dotted-quad). ip.To4()
 // returns nil for an IPv6 address, in which case this returns 0 rather
 // than a value that would look like a plausible (but wrong) match.
-func convert_addr(ipaddr string) int64 {
+func (p *PacExecutor) convert_addr(ipaddr string) int64 {
 	ip := net.ParseIP(ipaddr)
 	if ip == nil {
 		return 0
@@ -67,7 +73,7 @@ func convert_addr(ipaddr string) int64 {
 	ipInt.SetBytes(v4)
 	return ipInt.Int64()
 }
-func myIpAddress() string {
+func (p *PacExecutor) myIpAddress() string {
 	// Fallback if no suitable route/interface is found.
 	ip := "127.0.0.1"
 
@@ -81,11 +87,11 @@ func myIpAddress() string {
 	}
 	return ip
 }
-func dnsDomainLevels(host string) int {
+func (p *PacExecutor) dnsDomainLevels(host string) int {
 	host = strings.TrimSuffix(host, ".")
 	return len(strings.Split(host, ".")) - 1
 }
-func shExpMatch(str, shexp string) bool {
+func (p *PacExecutor) shExpMatch(str, shexp string) bool {
 	shexp = strings.ReplaceAll(shexp, ".", `\.`)
 	shexp = strings.ReplaceAll(shexp, "*", ".*")
 	shexp = strings.ReplaceAll(shexp, "?", ".")
@@ -113,7 +119,7 @@ func dayIndex(day string) int {
 // weekdayRange supports all three PAC call forms: a single day
 // ("MON"), a single day with GMT ("MON", "GMT"), and a day range
 // (start, end[, "GMT"]).
-func weekdayRange(start, end, tz string) bool {
+func (p *PacExecutor) weekdayRange(start, end, tz string) bool {
 	startDay := dayIndex(start)
 	endDay := dayIndex(end)
 	switch end {
@@ -141,11 +147,11 @@ func weekdayRange(start, end, tz string) bool {
 	}
 	return false
 }
-func dateRange() bool {
+func (p *PacExecutor) dateRange() bool {
 	// TODO implement PAC dateRange()
 	return true
 }
-func timeRange() bool {
+func (p *PacExecutor) timeRange() bool {
 	// TODO implement PAC timeRange()
 	return true
 }

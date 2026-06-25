@@ -5,7 +5,15 @@ import (
 	"time"
 )
 
+// testExecutor returns a *PacExecutor with sane default timeouts, for
+// tests that call builtin methods directly without going through NewPac
+// (so without compiling a goja program).
+func testExecutor() *PacExecutor {
+	return &PacExecutor{dnsTimeout: defaultDNSTimeout, scriptTimeout: defaultScriptTimeout}
+}
+
 func TestIsPlainHostName(t *testing.T) {
+	p := testExecutor()
 	cases := []struct {
 		host string
 		want bool
@@ -14,13 +22,14 @@ func TestIsPlainHostName(t *testing.T) {
 		{"www.example.com", false},
 	}
 	for _, c := range cases {
-		if got := isPlainHostName(c.host); got != c.want {
+		if got := p.isPlainHostName(c.host); got != c.want {
 			t.Errorf("isPlainHostName(%q) = %v, want %v", c.host, got, c.want)
 		}
 	}
 }
 
 func TestDnsDomainIs(t *testing.T) {
+	p := testExecutor()
 	cases := []struct {
 		host, domain string
 		want         bool
@@ -31,13 +40,14 @@ func TestDnsDomainIs(t *testing.T) {
 		{"notexample.com", "example.com", false},
 	}
 	for _, c := range cases {
-		if got := dnsDomainIs(c.host, c.domain); got != c.want {
+		if got := p.dnsDomainIs(c.host, c.domain); got != c.want {
 			t.Errorf("dnsDomainIs(%q, %q) = %v, want %v", c.host, c.domain, got, c.want)
 		}
 	}
 }
 
 func TestLocalHostOrDomainIs(t *testing.T) {
+	p := testExecutor()
 	cases := []struct {
 		host, hostdom string
 		want          bool
@@ -48,13 +58,14 @@ func TestLocalHostOrDomainIs(t *testing.T) {
 		{"other", "www.example.com", false},
 	}
 	for _, c := range cases {
-		if got := localHostOrDomainIs(c.host, c.hostdom); got != c.want {
+		if got := p.localHostOrDomainIs(c.host, c.hostdom); got != c.want {
 			t.Errorf("localHostOrDomainIs(%q, %q) = %v, want %v", c.host, c.hostdom, got, c.want)
 		}
 	}
 }
 
 func TestConvertAddr(t *testing.T) {
+	p := testExecutor()
 	cases := []struct {
 		ip   string
 		want int64
@@ -66,13 +77,14 @@ func TestConvertAddr(t *testing.T) {
 		{"::1", 0}, // IPv6 unsupported, returns 0 rather than a misleading value
 	}
 	for _, c := range cases {
-		if got := convert_addr(c.ip); got != c.want {
+		if got := p.convert_addr(c.ip); got != c.want {
 			t.Errorf("convert_addr(%q) = %#x, want %#x", c.ip, got, c.want)
 		}
 	}
 }
 
 func TestDnsDomainLevels(t *testing.T) {
+	p := testExecutor()
 	cases := []struct {
 		host string
 		want int
@@ -83,13 +95,14 @@ func TestDnsDomainLevels(t *testing.T) {
 		{"example.com.", 1}, // trailing dot shouldn't count as an extra level
 	}
 	for _, c := range cases {
-		if got := dnsDomainLevels(c.host); got != c.want {
+		if got := p.dnsDomainLevels(c.host); got != c.want {
 			t.Errorf("dnsDomainLevels(%q) = %d, want %d", c.host, got, c.want)
 		}
 	}
 }
 
 func TestShExpMatch(t *testing.T) {
+	p := testExecutor()
 	cases := []struct {
 		str, shexp string
 		want       bool
@@ -100,47 +113,51 @@ func TestShExpMatch(t *testing.T) {
 		{"foo.txt", "*.doc", false},
 	}
 	for _, c := range cases {
-		if got := shExpMatch(c.str, c.shexp); got != c.want {
+		if got := p.shExpMatch(c.str, c.shexp); got != c.want {
 			t.Errorf("shExpMatch(%q, %q) = %v, want %v", c.str, c.shexp, got, c.want)
 		}
 	}
 }
 
 func TestWeekdayRangeSingleDayForm(t *testing.T) {
+	p := testExecutor()
 	today := days[int(time.Now().Weekday())]
 	otherDay := days[(int(time.Now().Weekday())+1)%7]
 
-	if !weekdayRange(today, "", "") {
+	if !p.weekdayRange(today, "", "") {
 		t.Errorf("weekdayRange(%q, \"\", \"\") = false, want true", today)
 	}
-	if weekdayRange(otherDay, "", "") {
+	if p.weekdayRange(otherDay, "", "") {
 		t.Errorf("weekdayRange(%q, \"\", \"\") = true, want false", otherDay)
 	}
 }
 
 func TestWeekdayRangeSingleDayGmtForm(t *testing.T) {
+	p := testExecutor()
 	today := days[int(time.Now().UTC().Weekday())]
 	otherDay := days[(int(time.Now().UTC().Weekday())+1)%7]
 
-	if !weekdayRange(today, "GMT", "") {
+	if !p.weekdayRange(today, "GMT", "") {
 		t.Errorf("weekdayRange(%q, \"GMT\", \"\") = false, want true", today)
 	}
-	if weekdayRange(otherDay, "GMT", "") {
+	if p.weekdayRange(otherDay, "GMT", "") {
 		t.Errorf("weekdayRange(%q, \"GMT\", \"\") = true, want false", otherDay)
 	}
 }
 
 func TestWeekdayRangeUnknownDayIsFalse(t *testing.T) {
-	if weekdayRange("NOTADAY", "", "") {
+	p := testExecutor()
+	if p.weekdayRange("NOTADAY", "", "") {
 		t.Error(`weekdayRange("NOTADAY", "", "") = true, want false`)
 	}
 }
 
 func TestDateRangeAndTimeRangeAreStubs(t *testing.T) {
-	if !dateRange() {
+	p := testExecutor()
+	if !p.dateRange() {
 		t.Error("dateRange() = false, want true (stub always returns true)")
 	}
-	if !timeRange() {
+	if !p.timeRange() {
 		t.Error("timeRange() = false, want true (stub always returns true)")
 	}
 }

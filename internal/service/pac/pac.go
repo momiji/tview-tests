@@ -103,37 +103,29 @@ func (p *PacExecutor) Run(url, host string) (string, error) {
 
 func (p *PacExecutor) build() *goja.Runtime {
 	runtime := goja.New()
-	runtime.Set("isPlainHostName", isPlainHostName)
-	runtime.Set("dnsDomainIs", dnsDomainIs)
-	runtime.Set("localHostOrDomainIs", localHostOrDomainIs)
-	runtime.Set("isResolvable", func(host string) bool {
-		return isResolvable(host, p.dnsTimeout)
-	})
-	runtime.Set("isInNet", func(host, pattern, mask string) bool {
-		return isInNet(host, pattern, mask, p.dnsTimeout)
-	})
-	runtime.Set("dnsResolve", func(host string) string {
-		return dnsResolve(host, p.dnsTimeout)
-	})
-	runtime.Set("convert_addr", convert_addr)
-	runtime.Set("myIpAddress", myIpAddress)
-	runtime.Set("dnsDomainLevels", dnsDomainLevels)
-	runtime.Set("shExpMatch", shExpMatch)
-	runtime.Set("weekdayRange", weekdayRange)
-	runtime.Set("dateRange", dateRange)
-	runtime.Set("timeRange", timeRange)
-	runtime.Set("dnsResolveEx", func(host string) string {
-		return dnsResolveEx(host, p.dnsTimeout)
-	})
-	runtime.Set("isResolvableEx", func(host string) bool {
-		return isResolvableEx(host, p.dnsTimeout)
-	})
-	runtime.Set("isInNetEx", isInNetEx)
-	runtime.Set("myIpAddressEx", myIpAddressEx)
-	runtime.Set("alert", func(message string) {
-		if p.printer != nil {
-			p.printer.Infof("%s", message)
-		}
-	})
+	runtime.Set("isPlainHostName", p.isPlainHostName)
+	runtime.Set("dnsDomainIs", p.dnsDomainIs)
+	runtime.Set("localHostOrDomainIs", p.localHostOrDomainIs)
+	runtime.Set("isResolvable", p.isResolvable)
+	runtime.Set("isInNet", p.isInNet)
+	runtime.Set("dnsResolve", p.dnsResolve)
+	runtime.Set("convert_addr", p.convert_addr)
+	runtime.Set("myIpAddress", p.myIpAddress)
+	runtime.Set("dnsDomainLevels", p.dnsDomainLevels)
+	runtime.Set("shExpMatch", p.shExpMatch)
+	runtime.Set("weekdayRange", p.weekdayRange)
+	runtime.Set("dateRange", p.dateRange)
+	runtime.Set("timeRange", p.timeRange)
+	runtime.Set("dnsResolveEx", p.dnsResolveEx)
+	runtime.Set("isResolvableEx", p.isResolvableEx)
+	runtime.Set("isInNetEx", p.isInNetEx)
+	runtime.Set("myIpAddressEx", p.myIpAddressEx)
+	runtime.Set("alert", p.alert)
 	return runtime
+}
+
+func (p *PacExecutor) alert(message string) {
+	if p.printer != nil {
+		p.printer.Infof("%s", message)
+	}
 }
