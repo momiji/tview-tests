@@ -98,3 +98,8 @@ know about modes. Details and rationale:
 - [internal/service/secret](internal/service/secret/README.md) — encrypts
   and decrypts configuration passwords with a locally stored key file
   (AES-GCM).
+- [internal/config](internal/config/README.md) — turns command-line
+  arguments and a YAML/JSON file into a resolved proxy configuration
+  (three layers: `CmdArgs` / `FileConfig` / `ProxyConf`, with a tri-state
+  cascade for the verbose/debug/trace/mitm switches). No network, no
+  routing.

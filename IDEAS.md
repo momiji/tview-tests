@@ -17,3 +17,19 @@ port is stabilized.
 - **Reconsider MD5 key derivation.** Deriving the AES-256 key via MD5 of the
   key file is weak. Kept for backward compatibility with existing key files;
   evaluate a stronger KDF (with a migration path) later.
+
+## internal/config (step 2, from kpx/config.go)
+
+- **Immutability of `ProxyConf`.** Per MIGRATION.md §2, the resolved config
+  should be fully immutable after `build`. Today `markUsed` mutates
+  `rule.Proxy` (dns-only rules → `direct`) and routing-derived fields will be
+  filled in later (step 7). When routing lands, audit every field and make
+  the post-build object read-only (resolve dns→direct inside `buildRule`,
+  compute regex/pac artifacts before publishing).
+- **Per-(rule,proxy) switch resolution.** The cascade is resolved per entity
+  (proxy and rule separately) and combined at runtime. Once the processor
+  lands, confirm the combination order (proxy vs rule vs pac) matches §4.3
+  and consider precomputing the effective value per resolved decision.
+- **`build` re-reads the key file per encrypted password.** `secret.Cipher`
+  is created once now (good), but it still recomputes the key/hash on each
+  `Decrypt`; ties into the secret-package caching idea above.
