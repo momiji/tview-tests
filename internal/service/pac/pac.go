@@ -122,6 +122,14 @@ func (p *PacExecutor) build() *goja.Runtime {
 	runtime.Set("weekdayRange", weekdayRange)
 	runtime.Set("dateRange", dateRange)
 	runtime.Set("timeRange", timeRange)
+	runtime.Set("dnsResolveEx", func(host string) string {
+		return dnsResolveEx(host, p.dnsTimeout)
+	})
+	runtime.Set("isResolvableEx", func(host string) bool {
+		return isResolvableEx(host, p.dnsTimeout)
+	})
+	runtime.Set("isInNetEx", isInNetEx)
+	runtime.Set("myIpAddressEx", myIpAddressEx)
 	runtime.Set("alert", func(message string) {
 		if p.printer != nil {
 			p.printer.Infof("%s", message)

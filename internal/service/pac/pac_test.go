@@ -166,6 +166,30 @@ func TestRunUsesDNSTimeoutIndependentlyOfScriptTimeout(t *testing.T) {
 	}
 }
 
+func TestRunCallsIsInNetEx(t *testing.T) {
+	pe := newTestPac(t, `function FindProxyForURL(url, host) {
+		return isInNetEx(host, "2001:db8::/32") ? "MATCH" : "NOMATCH";
+	}`)
+	got, err := pe.Run("http://example.com", "2001:db8::1234")
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if got != "MATCH" {
+		t.Fatalf("Run = %q, want %q", got, "MATCH")
+	}
+}
+
+func TestRunCallsMyIpAddressEx(t *testing.T) {
+	pe := newTestPac(t, `function FindProxyForURL(url, host) { return myIpAddressEx(); }`)
+	got, err := pe.Run("http://example.com", "example.com")
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if got == "" {
+		t.Fatal("Run: myIpAddressEx() returned empty string")
+	}
+}
+
 func TestRunDoesNotLeakStateBetweenPooledRuntimes(t *testing.T) {
 	pe := newTestPac(t, `function FindProxyForURL(url, host) { return url + "|" + host; }`)
 

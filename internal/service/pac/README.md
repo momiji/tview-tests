@@ -57,6 +57,27 @@ server can't hang script evaluation. `weekdayRange` supports all three
 PAC call forms (a single day, a single day with `"GMT"`, or a day range),
 since PAC scripts can call it with 1, 2, or 3 arguments.
 
+## IPv6 builtins: the "Ex" family (`funcsex.go`)
+
+The classic builtins above (`isInNet`, `dnsResolve`, `isResolvable`,
+`myIpAddress`) are IPv4-only by spec. IPv6 support comes from a separate,
+Microsoft-originated extension also supported by Firefox and Chrome,
+kept in its own file since it's a distinct (if overlapping) API surface:
+
+- `isInNetEx(ipAddress, ipPrefix)` — like `isInNet`, but `ipPrefix` is
+  CIDR notation (`"2001:db8::/32"`) instead of a `pattern, mask` pair, so
+  it works for both IPv4 and IPv6 without the fixed-width-integer
+  masking `convert_addr` relies on. No DNS lookup — `ipAddress` is
+  expected to already be an IP.
+- `dnsResolveEx(host)` / `isResolvableEx(host)` — like `dnsResolve` /
+  `isResolvable`, but resolve to (or check for) *all* of a host's IPs,
+  v4 and v6, semicolon-separated. Bounded by the same
+  `PacOptions.DNSTimeout`.
+- `myIpAddressEx()` — like `myIpAddress`, but returns every non-loopback
+  IP (v4 and v6) configured on the host's interfaces, semicolon
+  separated, instead of just the one address the kernel would route
+  outbound traffic from.
+
 ## Logging (`alert`)
 
 A PAC script's `alert(message)` calls are wired in `build()` to the
@@ -70,11 +91,16 @@ project, so the executor needs its own `Printer` reference instead.
   always return `true`, regardless of arguments. A PAC script gating
   proxy use by date or time of day will behave as "always match," not
   fail loudly. Same as in kpx; not part of this migration.
-- **`convert_addr()` (and therefore `isInNet()`) is IPv4-only** —
-  matches the rest of these builtins, whose patterns/masks are always
-  dotted-quad, but it means an IPv6 host resolves to `0` (a value
-  indistinguishable from `0.0.0.0`) rather than erroring or being
-  handled correctly.
+- **`convert_addr()` (and therefore the classic `isInNet()`) is
+  IPv4-only** — matches the rest of those builtins, whose
+  patterns/masks are always dotted-quad, but it means an IPv6 host
+  resolves to `0` (a value indistinguishable from `0.0.0.0`) rather than
+  erroring. Use `isInNetEx()` (CIDR notation) for IPv6 matching instead.
+- **`sortIpAddressList()`, the remaining "Ex" builtin, is not
+  implemented** — only `isInNetEx`, `dnsResolveEx`, `isResolvableEx`,
+  and `myIpAddressEx` are. It would need RFC 6724-style address
+  preference ordering; PAC scripts rarely call it, so it wasn't worth
+  the complexity until one actually needs it.
 - **No size/complexity limit on PAC scripts** — only execution *time*
   is bounded (`PacOptions.ScriptTimeout`); a script that's merely slow
   to interrupt-check (e.g. tight loops without function calls) can still
