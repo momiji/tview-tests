@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"test/internal/service/printer"
 )
@@ -34,7 +35,7 @@ func captureStdout(t *testing.T, fn func()) string {
 
 func newTestPac(t *testing.T, pacJs string) *PacExecutor {
 	t.Helper()
-	pe, err := NewPac(pacJs, printer.New())
+	pe, err := NewPac(pacJs, printer.New(), nil)
 	if err != nil {
 		t.Fatalf("NewPac: %v", err)
 	}
@@ -42,13 +43,13 @@ func newTestPac(t *testing.T, pacJs string) *PacExecutor {
 }
 
 func TestNewPacCompilesValidScript(t *testing.T) {
-	if _, err := NewPac(`function FindProxyForURL(url, host) { return "DIRECT"; }`, printer.New()); err != nil {
+	if _, err := NewPac(`function FindProxyForURL(url, host) { return "DIRECT"; }`, printer.New(), nil); err != nil {
 		t.Fatalf("NewPac: %v", err)
 	}
 }
 
 func TestNewPacRejectsInvalidScript(t *testing.T) {
-	if _, err := NewPac(`function FindProxyForURL(url, host) {`, printer.New()); err == nil {
+	if _, err := NewPac(`function FindProxyForURL(url, host) {`, printer.New(), nil); err == nil {
 		t.Fatal("NewPac: expected error for invalid script, got nil")
 	}
 }
@@ -85,7 +86,7 @@ func TestRunSurfacesScriptRuntimeError(t *testing.T) {
 
 func TestAlertLogsThroughInjectedPrinter(t *testing.T) {
 	p := printer.New()
-	pe, err := NewPac(`function FindProxyForURL(url, host) { alert("hi from pac"); return "DIRECT"; }`, p)
+	pe, err := NewPac(`function FindProxyForURL(url, host) { alert("hi from pac"); return "DIRECT"; }`, p, nil)
 	if err != nil {
 		t.Fatalf("NewPac: %v", err)
 	}
@@ -109,6 +110,59 @@ func TestAlertLogsThroughInjectedPrinter(t *testing.T) {
 
 	if !strings.Contains(out, "hi from pac") {
 		t.Fatalf("expected output to contain %q, got %q", "hi from pac", out)
+	}
+}
+
+func TestRunInterruptsScriptExceedingTimeout(t *testing.T) {
+	pe, err := NewPac(
+		`function FindProxyForURL(url, host) { while (true) {} }`,
+		printer.New(),
+		&PacOptions{ScriptTimeout: 50 * time.Millisecond},
+	)
+	if err != nil {
+		t.Fatalf("NewPac: %v", err)
+	}
+	if _, err := pe.Run("http://example.com", "example.com"); err == nil {
+		t.Fatal("Run: expected timeout error for infinite-looping script, got nil")
+	}
+}
+
+func TestRunReusesPooledRuntimeAfterTimeout(t *testing.T) {
+	pe, err := NewPac(
+		`function FindProxyForURL(url, host) { if (host == "slow") { while (true) {} } return "DIRECT"; }`,
+		printer.New(),
+		&PacOptions{ScriptTimeout: 50 * time.Millisecond},
+	)
+	if err != nil {
+		t.Fatalf("NewPac: %v", err)
+	}
+	if _, err := pe.Run("http://slow", "slow"); err == nil {
+		t.Fatal("Run: expected timeout error for infinite-looping script, got nil")
+	}
+	got, err := pe.Run("http://example.com", "example.com")
+	if err != nil {
+		t.Fatalf("Run after timeout: %v", err)
+	}
+	if got != "DIRECT" {
+		t.Fatalf("Run after timeout = %q, want %q", got, "DIRECT")
+	}
+}
+
+func TestRunUsesDNSTimeoutIndependentlyOfScriptTimeout(t *testing.T) {
+	pe, err := NewPac(
+		`function FindProxyForURL(url, host) { return isResolvable(host) ? "PROXY" : "DIRECT"; }`,
+		printer.New(),
+		&PacOptions{DNSTimeout: time.Nanosecond, ScriptTimeout: time.Second},
+	)
+	if err != nil {
+		t.Fatalf("NewPac: %v", err)
+	}
+	got, err := pe.Run("http://example.com", "example.com")
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if got != "DIRECT" {
+		t.Fatalf("Run = %q, want %q (isResolvable should time out immediately and return false)", got, "DIRECT")
 	}
 }
 

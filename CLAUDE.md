@@ -12,6 +12,13 @@
 - Do not run the app yourself to test it (e.g. via pty/python harnesses).
   The user runs it manually (it's an interactive TUI) and reports results.
   Stick to `go build`/`go vet` to confirm it compiles.
+- Every package `README.md` that has any known gaps — unimplemented
+  functions/stubs, partial spec support, deliberately out-of-scope
+  behavior — must call them out in a dedicated `## Limitations` section,
+  so they're easy to find rather than buried inline in prose elsewhere
+  in the doc (see `internal/service/pac/README.md` for the pattern).
+  When code changes close a limitation, remove or update its entry in
+  the same change; when new code introduces one, add it there too.
 
 ## Migrating from kpx/
 

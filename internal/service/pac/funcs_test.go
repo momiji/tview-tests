@@ -1,6 +1,9 @@
 package pac
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestIsPlainHostName(t *testing.T) {
 	cases := []struct {
@@ -60,6 +63,7 @@ func TestConvertAddr(t *testing.T) {
 		{"255.255.255.0", 0xFFFFFF00},
 		{"127.0.0.1", 0x7F000001},
 		{"not-an-ip", 0},
+		{"::1", 0}, // IPv6 unsupported, returns 0 rather than a misleading value
 	}
 	for _, c := range cases {
 		if got := convert_addr(c.ip); got != c.want {
@@ -76,6 +80,7 @@ func TestDnsDomainLevels(t *testing.T) {
 		{"www", 0},
 		{"example.com", 1},
 		{"www.example.com", 2},
+		{"example.com.", 1}, // trailing dot shouldn't count as an extra level
 	}
 	for _, c := range cases {
 		if got := dnsDomainLevels(c.host); got != c.want {
@@ -98,6 +103,36 @@ func TestShExpMatch(t *testing.T) {
 		if got := shExpMatch(c.str, c.shexp); got != c.want {
 			t.Errorf("shExpMatch(%q, %q) = %v, want %v", c.str, c.shexp, got, c.want)
 		}
+	}
+}
+
+func TestWeekdayRangeSingleDayForm(t *testing.T) {
+	today := days[int(time.Now().Weekday())]
+	otherDay := days[(int(time.Now().Weekday())+1)%7]
+
+	if !weekdayRange(today, "", "") {
+		t.Errorf("weekdayRange(%q, \"\", \"\") = false, want true", today)
+	}
+	if weekdayRange(otherDay, "", "") {
+		t.Errorf("weekdayRange(%q, \"\", \"\") = true, want false", otherDay)
+	}
+}
+
+func TestWeekdayRangeSingleDayGmtForm(t *testing.T) {
+	today := days[int(time.Now().UTC().Weekday())]
+	otherDay := days[(int(time.Now().UTC().Weekday())+1)%7]
+
+	if !weekdayRange(today, "GMT", "") {
+		t.Errorf("weekdayRange(%q, \"GMT\", \"\") = false, want true", today)
+	}
+	if weekdayRange(otherDay, "GMT", "") {
+		t.Errorf("weekdayRange(%q, \"GMT\", \"\") = true, want false", otherDay)
+	}
+}
+
+func TestWeekdayRangeUnknownDayIsFalse(t *testing.T) {
+	if weekdayRange("NOTADAY", "", "") {
+		t.Error(`weekdayRange("NOTADAY", "", "") = true, want false`)
 	}
 }
 
