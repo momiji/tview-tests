@@ -1,0 +1,155 @@
+package kerberos
+
+import (
+	"crypto/sha1"
+	"encoding/base64"
+	"fmt"
+	"strings"
+	"sync"
+
+	"github.com/jcmturner/gokrb5/v8/client"
+	"github.com/jcmturner/gokrb5/v8/krberror"
+	"github.com/jcmturner/gokrb5/v8/spnego"
+	"github.com/palantir/stacktrace"
+
+	appconfig "test/internal/config"
+	"test/internal/service/printer"
+)
+
+// noAuth is the sentinel "no authentication" token returned when a client
+// cannot be created (its pointer is shared, never mutated).
+var noAuth = ""
+
+type Store struct {
+	kerberos     *Kerberos
+	clients      map[string]*Client
+	clientsMutex sync.Mutex
+}
+
+func NewStore(conf *appconfig.ProxyConf, p *printer.Printer) (*Store, error) {
+	kerberos := NewKerberos(conf, p)
+	err := kerberos.init()
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "unable to initialize kerberos")
+	}
+	return &Store{
+		kerberos: kerberos,
+		clients:  make(map[string]*Client),
+	}, nil
+}
+
+func (ks *Store) safeGetClient(key string) *Client {
+	ks.clientsMutex.Lock()
+	cl := ks.clients[key]
+	ks.clientsMutex.Unlock()
+	return cl
+}
+
+func (ks *Store) safeSaveClient(key string, client *Client) {
+	ks.clientsMutex.Lock()
+	ks.clients[key] = client
+	ks.clientsMutex.Unlock()
+}
+
+func (ks *Store) safeRemoveClient(key string) {
+	ks.clientsMutex.Lock()
+	ks.clients[key] = nil
+	ks.clientsMutex.Unlock()
+}
+
+// safeTryLogin logs in with the given credentials, only if not yet logged in.
+func (ks *Store) safeTryLogin(username, realm, password string, force bool) (*Client, error) {
+	// create key
+	key := ks.clientKey(username, realm, password)
+	// remove client to force login?
+	if force {
+		ks.safeRemoveClient(key)
+	}
+	// get existing client
+	kcl := ks.safeGetClient(key)
+	if kcl != nil {
+		return kcl, nil
+	}
+	// create new client
+	krbClient := ks.kerberos.NewWithPassword(username, realm, password)
+	if krbClient == nil {
+		return nil, nil
+	}
+	err := krbClient.Login()
+	if err != nil {
+		if e, ok := err.(krberror.Krberror); ok {
+			return nil, stacktrace.Propagate(err, "Invalid login/password for user '%s' on realm '%s'\n%s\n%s", username, realm, e.RootCause, strings.Join(e.EText, "\n"))
+		}
+		return nil, stacktrace.Propagate(err, "Invalid login/password for user '%s' on realm '%s'", username, realm)
+	}
+	// save client
+	kcl = NewClient(krbClient)
+	ks.safeSaveClient(key, kcl)
+	return kcl, nil
+}
+
+func (ks *Store) safeGetToken(username, realm, password, protocol string, host string) (*string, error) {
+	kcl, err := ks.safeTryLogin(username, realm, password, false)
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "unable to login to kerberos")
+	}
+	if kcl == nil {
+		return &noAuth, nil
+	}
+	token, err := kcl.safeGetToken(protocol, host)
+	if err != nil {
+		kcl, err = ks.safeTryLogin(username, realm, password, true)
+		if kcl == nil {
+			return &noAuth, nil
+		}
+		if err != nil {
+			return nil, stacktrace.Propagate(err, "unable to login to kerberos")
+		}
+		token, err = kcl.safeGetToken(protocol, host)
+		if err != nil {
+			return nil, stacktrace.Propagate(err, "unable to get kerberos token")
+		}
+	}
+	return token, nil
+}
+
+func (ks *Store) clientKey(username string, realm string, password string) string {
+	hasher := sha1.New()
+	hasher.Write([]byte(password))
+	hash := hasher.Sum(nil)
+	key := fmt.Sprintf("%s\x00%s\x00%s", hash, username, realm)
+	return key
+}
+
+type Client struct {
+	mutex     sync.Mutex
+	krbClient *client.Client
+}
+
+func NewClient(krbClient *client.Client) *Client {
+	return &Client{
+		krbClient: krbClient,
+		mutex:     sync.Mutex{},
+	}
+}
+
+func (kc *Client) safeGetToken(protocol string, host string) (*string, error) {
+	kc.mutex.Lock()
+	defer kc.mutex.Unlock()
+	spn := protocol + "/" + host
+	s := spnego.SPNEGOClient(kc.krbClient, spn)
+	err := s.AcquireCred()
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "unable to acquire client credential for spn: %s", spn)
+	}
+	st, err := s.InitSecContext()
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "unable to initialize security context for spn: %s", spn)
+	}
+	nb, err := st.Marshal()
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "unable to marshal security token for spn: %s", spn)
+	}
+	hs := base64.StdEncoding.EncodeToString(nb)
+	return &hs, nil
+}

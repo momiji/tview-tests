@@ -101,6 +101,10 @@ know about modes. Details and rationale:
 - [internal/service/cert](internal/service/cert/README.md) — the X.509
   building blocks for MITM: a self-signed CA and a cache of per-host leaf
   certificates minted on demand.
+- [internal/service/kerberos](internal/service/kerberos/README.md) —
+  authenticates upstream proxies with SPNEGO/Negotiate tokens: a cache of
+  password-based clients plus the native OS single-sign-on path (ccache on
+  Linux, SSPI on Windows).
 - [internal/config](internal/config/README.md) — turns command-line
   arguments and a YAML/JSON file into a resolved proxy configuration
   (three layers: `CmdArgs` / `FileConfig` / `ProxyConf`, with a tri-state

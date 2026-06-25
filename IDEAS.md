@@ -6,6 +6,10 @@ faithful — see [MIGRATION.md](MIGRATION.md) §6 and `CLAUDE.md`). Each entry:
 component + idea + why (+ a code pointer when useful). Revisit these after the
 port is stabilized.
 
+## general idea
+
+- Check if project is now usable as a library, and identify what needs to be enhanced to do so, like changeing the printer fmp.Printf with a customizable Println func and a default printer implement that just do ft.Print
+
 ## internal/service/secret (step 1, from kpx/password.go)
 
 - **Cache the derived key/hash.** `Encrypt`/`Decrypt` re-read the key file and
@@ -44,3 +48,17 @@ port is stabilized.
 - **Hardcoded 2048-bit RSA / fixed validity windows.** Key size and the
   CA/leaf NotAfter (100y / 10y) are baked in. Consider making them
   configurable.
+
+## internal/service/kerberos (step 4, from kpx/kerberos*.go)
+
+- **Shared `splitUsername`/`splitHostPort`.** Local copies now live in both
+  `config` and `kerberos`; fold them into a shared util when the CLI lands.
+- **App-level defaults parked here.** `DefaultDomain`/`DefaultKrb5` (and the
+  similar `AppName`/`AppVersion`/... globals still in the legacy source) want
+  a dedicated app/meta home rather than living in this service.
+- **`NewWithPassword` copies krb5 config via `&(*k.krbCfg)`.** Shallow copy
+  of a struct holding slices/maps; the realm append mutates the copy but the
+  sharing is subtle. Audit for races when the processor runs it concurrently.
+- **SPNEGO clients with no TTL/refresh.** Cached clients in `Store` are never
+  evicted except on token failure (forced re-login). Consider ticket
+  lifetime handling.
