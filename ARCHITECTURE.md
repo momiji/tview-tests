@@ -98,6 +98,9 @@ know about modes. Details and rationale:
 - [internal/service/secret](internal/service/secret/README.md) — encrypts
   and decrypts configuration passwords with a locally stored key file
   (AES-GCM).
+- [internal/service/cert](internal/service/cert/README.md) — the X.509
+  building blocks for MITM: a self-signed CA and a cache of per-host leaf
+  certificates minted on demand.
 - [internal/config](internal/config/README.md) — turns command-line
   arguments and a YAML/JSON file into a resolved proxy configuration
   (three layers: `CmdArgs` / `FileConfig` / `ProxyConf`, with a tri-state

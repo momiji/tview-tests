@@ -33,3 +33,14 @@ port is stabilized.
 - **`build` re-reads the key file per encrypted password.** `secret.Cipher`
   is created once now (good), but it still recomputes the key/hash on each
   `Decrypt`; ties into the secret-package caching idea above.
+
+## internal/service/cert (step 3, from kpx/certs.go + certs_manager.go)
+
+- **`NewManager` swallows an error in the default branch.** In the preload
+  loop, the final `else` assigns `certs.certificates[dns], err =
+  newCertificate(dns)` but does not check `err` (unlike the `*.` branch).
+  A failure there is silently ignored. Preserved as-is during the port;
+  worth tightening.
+- **Hardcoded 2048-bit RSA / fixed validity windows.** Key size and the
+  CA/leaf NotAfter (100y / 10y) are baked in. Consider making them
+  configurable.
