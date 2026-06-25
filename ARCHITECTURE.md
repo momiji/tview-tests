@@ -19,6 +19,7 @@ internal/
   service/         standalone background components, not UI-specific
     clock/         the core "current time" value
     printer/       the toggleable, asynchronous stdout writer
+    pac/           PAC (Proxy Auto-Configuration) script evaluation
 ```
 
 `service/` is where future non-UI components (config, a socket/net server,
@@ -92,3 +93,6 @@ know about modes. Details and rationale:
   worker + queue, with a `Flush` for graceful handoffs/shutdown), plus
   formatted/request-trace logging methods built on top of it (migrated
   from kpx).
+- [internal/service/pac](internal/service/pac/README.md) — evaluates PAC
+  (Proxy Auto-Configuration) scripts via goja to pick a proxy for a given
+  URL/host (migrated from kpx).
