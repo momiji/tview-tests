@@ -9,6 +9,7 @@ port is stabilized.
 ## general idea
 
 - Check if project is now usable as a library, and identify what needs to be enhanced to do so, like changeing the printer fmp.Printf with a customizable Println func and a default printer implement that just do ft.Print
+- Add an option to cache pac js, userfull maybe for servers usage?
 
 ## internal/service/secret (step 1, from kpx/password.go)
 
@@ -84,3 +85,20 @@ port is stabilized.
   shared util at the CLI step.
 - **Mixed pointer/value receivers** kept from the original; the value
   receivers on the write methods are harmless (no mutation) but inconsistent.
+
+## internal/proxy/router (step 7, from kpx/config.go matching)
+
+- **Router mutates the resolved config.** `NewRouter` writes `PacJs`/
+  `PacRuntime` onto `config.Proxy`. To make `ProxyConf` truly immutable,
+  consider holding the per-proxy PAC runtimes in a router-owned map keyed by
+  proxy name, rather than on the shared config struct.
+  Or maybe by proxy url, because I can change the proxy url and keep the same name and config will reload but the js will not be refreshed?
+- **`errors.New(fmt.Sprintf(...))`** in `downloadPac` should be `fmt.Errorf`
+  (kept verbatim from the original).
+- **Persistent PAC js cache.** `pacsCache` is in-memory only; a used pac that
+  fails to download with no cached copy degrades to the default proxy. A
+  disk-backed cache would help server usage (see the "cache pac js" general
+  idea above).
+- **Host cache never invalidated.** Entries live for the router's lifetime;
+  a config reload builds a new router, but long-lived routers never expire
+  stale host→proxy decisions.

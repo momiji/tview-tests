@@ -62,20 +62,18 @@ The following parts of the historical `config.go` are **deliberately not in
 this package**; they belong to later migration steps and are tracked in
 [../../MIGRATION.md](../../MIGRATION.md):
 
-- **Routing / matching** (`match`, `resolve`, `resolvePac`, the host cache,
-  the rule/pac regexes, `genPac`, the `PROXY/SOCKS` PAC strings) → the
-  `router` package (step 7). Consequently `Proxy`/`Rule` here do **not** yet
-  carry the `regex`/`pacRegex`/`pacJs`/`pacRuntime`/`pacProxy` fields.
-- **PAC download** (`downloadPac`, `pacToExecutor`, the HTTP client) → also
-  the routing step; it is network work. (The `isUsed` marking does **not**
-  depend on it: a used `pac` proxy and every credential in its `credentials`
-  list are marked here, independently of any download.)
-- **Certificate generation** (`genCerts`, the CA/`CertsManager` wiring for
-  MITM) → the `cert` service (step 3) and its orchestration.
+- **Runtime matching** (`match`, `resolve`, `resolvePac`, the host cache,
+  `genPac`, the PAC download) → the `router` package. `build` compiles the
+  static derived data here (`Regex` on rules, `PacRegex`/`PacProxy` on
+  proxies, the sorted `PacProxies`), but the per-proxy `PacJs`/`PacRuntime`
+  are filled in by the router after the PAC download, so the resolved config
+  is not fully populated until the router has run.
+- **Certificate generation** (`genCerts`, the CA/`Manager` wiring for MITM)
+  → the `cert` service and its orchestration.
 - **Interactive credential prompts** (`askCredentials`) → the CLI/runtime
   layer (it reads the terminal).
 - **PAC-level switch resolution** — the cascade's `pac` level is applied at
-  match time, not here (see above).
+  match time, in the router, not here.
 
 The `connection-pools` and `idleTimeout`/`closeTimeout` knobs are dropped on
 purpose (see [MIGRATION.md](../../MIGRATION.md) §5): only `connectTimeout`

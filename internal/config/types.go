@@ -9,8 +9,15 @@
 //
 // It performs no network and no runtime work: matching, PAC download/eval,
 // certificate generation and host caching live in their own packages and
-// run later.
+// run later. The pac runtime/js fields on Proxy are filled in later by the
+// router (after the PAC download), not by build().
 package config
+
+import (
+	"regexp"
+
+	"test/internal/service/pac"
+)
 
 // ProxyType is the configured kind of a proxy entry.
 type ProxyType string
@@ -175,22 +182,26 @@ type ProxyConf struct {
 	Experimental   string
 	ACL            []string
 	ConsoleUI      bool
+	// derived
+	PacProxy               string   // "PROXY bind:port" served as the default
+	PacProxies             []*Proxy // pac proxies, ordered by PacOrder
+	ExperimentalHostsCache bool     // coarse per-host match cache, disables fine url lookup
 }
 
 type Cred struct {
-	name      string
+	Name      string
 	Login     *string
 	Password  *string
-	isNull    bool
-	isPerUser bool
-	isUsed    bool // set if not null, not per-user and used by a rule => proxy
-	isNative  bool // native kerberos implementation
+	IsNull    bool
+	IsPerUser bool
+	IsUsed    bool // set if not null, not per-user and used by a rule => proxy
+	IsNative  bool // native kerberos implementation
 }
 
 type Proxy struct {
-	name        string
+	Name        string
 	Type        *ProxyType
-	typeValue   int
+	TypeValue   int
 	Host        *string
 	Port        int
 	Ssl         bool
@@ -198,16 +209,21 @@ type Proxy struct {
 	Realm       *string
 	Credential  *string
 	Credentials *string
-	cred        *Cred // not nil for kerberos/basic, and for authenticated socks
+	Cred        *Cred // not nil for kerberos/basic, and for authenticated socks
 	Pac         *string
 	PacOrder    int
 	Url         *string
-	isUsed      bool
+	IsUsed      bool
 	// effective switches (cascade applied)
 	Verbose bool
 	Debug   bool
 	Trace   bool
 	Mitm    bool
+	// routing-derived (PacRegex/PacProxy by build, PacJs/PacRuntime by router)
+	PacRegex   *Regex
+	PacProxy   *string
+	PacJs      *string
+	PacRuntime *pac.PacExecutor
 }
 
 type Rule struct {
@@ -219,12 +235,22 @@ type Rule struct {
 	Debug   bool
 	Trace   bool
 	Mitm    bool
+	// compiled host matcher
+	Regex *Regex
 }
 
-func (r *Rule) firstProxy() string {
+// Regex is a compiled host matcher: a glob (translated to a regexp) or a raw
+// `re:` regexp, optionally negated with a leading `!`.
+type Regex struct {
+	Pattern *regexp.Regexp
+	Regex   string
+	Exclude bool
+}
+
+func (r *Rule) FirstProxy() string {
 	return splitFirst(*r.Proxy)
 }
 
-func (r *Rule) allProxiesName() []string {
+func (r *Rule) AllProxiesName() []string {
 	return splitComma(*r.Proxy)
 }

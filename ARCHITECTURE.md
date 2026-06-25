@@ -117,3 +117,6 @@ know about modes. Details and rationale:
 - [internal/proxy/message](internal/proxy/message/README.md) — reads, parses
   and writes the raw HTTP messages (`ProxyRequest` / `RequestHeader`),
   keeping header lines verbatim for faithful forwarding.
+- [internal/proxy/router](internal/proxy/router/README.md) — runtime
+  matching: maps a request to a rule and its upstream proxies (resolving PAC
+  scripts, caching per host), and generates the local `proxy.pac`.
