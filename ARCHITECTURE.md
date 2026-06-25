@@ -110,3 +110,7 @@ know about modes. Details and rationale:
   (three layers: `CmdArgs` / `FileConfig` / `ProxyConf`, with a tri-state
   cascade for the verbose/debug/trace/mitm switches). No network, no
   routing.
+- [internal/proxy/transport](internal/proxy/transport/README.md) — low-level
+  connection helpers: TCP tuning (`ConfigureConn`), a byte-counting
+  `TrafficConn` (metered through a UI-agnostic `TrafficMeter` port), and an
+  instrumented HTTP "chunked" reader/writer.

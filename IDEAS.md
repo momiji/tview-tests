@@ -62,3 +62,14 @@ port is stabilized.
 - **SPNEGO clients with no TTL/refresh.** Cached clients in `Store` are never
   evicted except on token failure (forced re-login). Consider ticket
   lifetime handling.
+
+## internal/proxy/transport (step 5, from kpx/conn.go + chunked.go)
+
+- **UI reconciliation (step 14).** The UI's `TrafficRow` must implement
+  `transport.TrafficMeter` (`AddReceived`/`AddSent`), or an adapter must,
+  when the traffic UI is migrated. The metering currently has no
+  implementation wired.
+- **Header-read timeout in the processor.** When the processor is migrated,
+  bound the request-header read with a one-shot
+  `conn.SetReadDeadline(now + connectTimeout)` (the replacement for the
+  dropped `TimedConn`); make sure it is cleared afterwards.
