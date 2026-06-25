@@ -28,9 +28,7 @@ into the rest of the app.
   worker to write; a no-op when disabled. Never blocks on I/O: if the
   internal queue (`queueSize`, currently 10000 — sized for bursts of
   per-request trace logging, not just the clock's one-line-every-2s
-  ticks; matches kpx's old `DefaultQueueSize`, the equivalent knob in
-  go-logging's async logger) is full, the line is dropped rather than
-  stalling the caller.
+  ticks) is full, the line is dropped rather than stalling the caller.
 - `(*Printer).Flush(ctx context.Context) error` — blocks until every line
   queued before the call has been processed by the worker (written, or
   discarded if disabled in the meantime), or returns `ctx.Err()` if `ctx`
@@ -38,18 +36,17 @@ into the rest of the app.
   waiting for the worker to reach it — relies on `Run` having been
   started.
 
-## Logging methods (migrated from kpx)
+## Logging methods
 
-Two more files in this package add formatted logging on top of `Printer`,
-ported from kpx's `log.go`. Both go through `Println` like everything
-else, so log lines share the same async/toggleable behavior as the
-clock's output — no separate logging library or lifecycle (kpx's
-`logInit`/`logDestroy`/`logWriter`/`logFlush`) is needed here: `New`/`Run`
-and `Enable`/`Disable`/`Flush` already cover that.
+Two more files in this package add formatted logging on top of `Printer`.
+Both go through `Println` like everything else, so log lines share the same
+async/toggleable behavior as the clock's output — no separate logging
+library or lifecycle is needed here: `New`/`Run` and
+`Enable`/`Disable`/`Flush` already cover that.
 
 - `logger.go` — general-purpose formatted logging: `(*Printer).Printf`,
   `Infof`, `Errorf`. Each prefixes a timestamp and queues the result via
-  `Println`. kpx's `logFatal` was not migrated.
+  `Println`. There is no `Fatal`-style method.
 - `request.go` — request/trace-specific logging, kept separate from the
   general-purpose methods above because it's only meaningful while
   processing a request: `ReqLogInfo`/`NewReqLogInfo` tag a request with an

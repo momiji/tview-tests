@@ -15,6 +15,14 @@
 - Do not run the app yourself to test it (e.g. via pty/python harnesses).
   The user runs it manually (it's an interactive TUI) and reports results.
   Stick to `go build`/`go vet` to confirm it compiles.
+- No `kpx` references in shipped code or product docs. Code comments,
+  identifiers, and package `README.md`/`ARCHITECTURE.md` content must not
+  mention `kpx` or describe code as "ported/migrated from kpx", "from the
+  original kpx code", etc. This project *is* becoming kpx v2 — a direct
+  drop-in replacement for the current version — so to its own code and docs
+  there is no separate "kpx" to point at. Describe what the code does, not
+  where it came from. (Exception: the migration-tracking docs `MIGRATION.md`
+  and `IDEAS.md` are about the port itself, so they reference `kpx` freely.)
 - Every package `README.md` that has any known gaps — unimplemented
   functions/stubs, partial spec support, deliberately out-of-scope
   behavior — must call them out in a dedicated `## Limitations` section,

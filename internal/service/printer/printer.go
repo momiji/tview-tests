@@ -15,9 +15,7 @@ import (
 // queueSize bounds how many not-yet-written lines can be buffered. Once
 // full, Println drops the line rather than blocking the caller. Sized for
 // bursts of per-request trace logging, not just the clock's one-line-every-
-// 2s ticks: matches kpx's old DefaultQueueSize (the equivalent knob in
-// go-logging's async logger, see kpx's logInit), which was tuned for that
-// same proxy-traffic volume.
+// 2s ticks: 10000 is tuned for that proxy-traffic volume.
 const queueSize = 10000
 
 // job is either a line to write, a flush request (ack set, line empty), or

@@ -91,8 +91,10 @@ know about modes. Details and rationale:
 - [internal/service/printer](internal/service/printer/README.md) — the
   dedicated, disableable, asynchronous stdout writer (own background
   worker + queue, with a `Flush` for graceful handoffs/shutdown), plus
-  formatted/request-trace logging methods built on top of it (migrated
-  from kpx).
+  formatted/request-trace logging methods built on top of it.
 - [internal/service/pac](internal/service/pac/README.md) — evaluates PAC
   (Proxy Auto-Configuration) scripts via goja to pick a proxy for a given
-  URL/host (migrated from kpx).
+  URL/host.
+- [internal/service/secret](internal/service/secret/README.md) — encrypts
+  and decrypts configuration passwords with a locally stored key file
+  (AES-GCM).

@@ -1,7 +1,7 @@
 # internal/service/pac
 
 Evaluates PAC (Proxy Auto-Configuration) scripts to decide, for a given
-URL/host, what proxy (if any) to use. Migrated from kpx's `pac.go`. See
+URL/host, what proxy (if any) to use. See
 [../../../ARCHITECTURE.md](../../../ARCHITECTURE.md) for how this fits
 into the rest of the app.
 
@@ -86,16 +86,16 @@ kept in its own file since it's a distinct (if overlapping) API surface:
 ## Logging (`alert`)
 
 A PAC script's `alert(message)` calls are wired in `build()` to the
-`*printer.Printer` injected via `NewPac`, calling `Printer.Infof`. This
-replaces kpx's global `logInfo` — there's no global logger in this
-project, so the executor needs its own `Printer` reference instead.
+`*printer.Printer` injected via `NewPac`, calling `Printer.Infof`. There's
+no global logger in this project, so the executor needs its own `Printer`
+reference instead.
 
 ## Limitations
 
 - **`dateRange()` and `timeRange()` are unimplemented stubs** — both
   always return `true`, regardless of arguments. A PAC script gating
   proxy use by date or time of day will behave as "always match," not
-  fail loudly. Same as in kpx; not part of this migration.
+  fail loudly.
 - **`convert_addr()` (and therefore the classic `isInNet()`) is
   IPv4-only** — matches the rest of those builtins, whose
   patterns/masks are always dotted-quad, but it means an IPv6 host
