@@ -1,5 +1,8 @@
 # Project instructions
 
+- Language: all documentation and code (including comments, identifiers,
+  commit messages, and `README.md`/`ARCHITECTURE.md` content) must be
+  written in English. Only chat replies to the user may be in French.
 - Documentation is split by altitude: `ARCHITECTURE.md` stays high-level
   (run modes, the overall core idea, and a one-line-per-package index
   linking to each package's README). Detailed, package-specific design
