@@ -38,6 +38,7 @@ type Runtime struct {
 	kerberos *kerberos.Store
 	certs    *cert.Manager
 	printer  *printer.Printer
+	traffic  TrafficSink
 
 	ctx          context.Context
 	cancel       context.CancelFunc
@@ -51,12 +52,17 @@ func NewRuntime(ctx context.Context, conf *config.ProxyConf, rt *router.Router, 
 		kerberos: krb,
 		certs:    certs,
 		printer:  p,
+		traffic:  nopSink{},
 		ctx:      ctx,
 		cancel:   cancel,
 	}
 	r.current.Store(&snapshot{conf: conf, router: rt, selector: sel})
 	return r
 }
+
+// SetTrafficSink installs the traffic sink (the UI's table adapter). Call it
+// before serving; the default is a no-op sink.
+func (r *Runtime) SetTrafficSink(sink TrafficSink) { r.traffic = sink }
 
 // Reload publishes a new config/router/selector snapshot and bumps the load
 // counter, so connections started before the reload are not reused after it.

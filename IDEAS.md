@@ -155,3 +155,11 @@ port is stabilized.
   immutability goal.
 - **Console UI (`--ui`) parsed but not wired** until the UI reconciliation
   (step 14); the proxy runs in plain logging mode.
+
+## internal/ui/traffic (step 14a)
+
+- **Keep-alive rows leak.** Each processChannel iteration creates a new
+  TrafficRow but only the last is Removed on close; intermediate keep-alive
+  rows are never marked Removed, so RemoveDead never drops them. Faithful to
+  the original; fix by reusing one row per connection or removing on each
+  iteration.

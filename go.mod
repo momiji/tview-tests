@@ -16,6 +16,7 @@ require (
 
 require (
 	github.com/dlclark/regexp2 v1.11.4 // indirect
+	github.com/enterprizesoftware/rate-counter v0.0.0-20231214045714-3538d92854e2 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/gdamore/encoding v1.0.1 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
@@ -34,6 +35,7 @@ require (
 	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/txthinking/runnergroup v0.0.0-20210608031112-152c7c4432bf // indirect
 	github.com/txthinking/socks5 v0.0.0-20251011041537-5c31f201a10e // indirect
+	go.uber.org/atomic v1.9.0 // indirect
 	golang.org/x/crypto v0.43.0 // indirect
 	golang.org/x/net v0.46.0 // indirect
 	golang.org/x/text v0.38.0 // indirect

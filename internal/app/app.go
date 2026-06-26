@@ -27,6 +27,7 @@ import (
 	"test/internal/service/cert"
 	"test/internal/service/kerberos"
 	"test/internal/service/printer"
+	"test/internal/ui/traffic"
 	"test/internal/update"
 )
 
@@ -102,6 +103,22 @@ func run(ctx context.Context, args config.CmdArgs, meta cli.Meta, p *printer.Pri
 	sel := upstream.NewSelector(conf, p)
 
 	runtime := processor.NewRuntime(ctx, conf, rt, sel, krb, certs, p)
+
+	// traffic accounting (always on; the UI renders this table when enabled)
+	trafficTable := traffic.NewTrafficTable()
+	runtime.SetTrafficSink(traffic.NewSink(trafficTable))
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-runtime.Context().Done():
+				return
+			case <-ticker.C:
+				trafficTable.RemoveDead()
+			}
+		}
+	}()
 
 	// auto-exit after the timeout (single-proxy mode)
 	if args.Timeout > 0 {

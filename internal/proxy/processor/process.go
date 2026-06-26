@@ -39,7 +39,7 @@ type Process struct {
 	logHostPort string
 	loadCounter int32
 	ti          *printer.ReqLogInfo
-	traffic     *TrafficRow
+	meter       transport.TrafficMeter
 }
 
 func NewProcess(runtime *Runtime, conn net.Conn) *Process {
@@ -131,8 +131,10 @@ func (p *Process) processChannel(clientChannel, proxyChannel *message.ProxyReque
 	}
 
 	// traffic data
-	p.traffic = NewTrafficRow(p.reqId, p.logTraffic)
-	p.trafficConn.SetMeter(p.traffic)
+	p.meter = p.runtime.traffic.New(p.reqId, p.logTraffic)
+	if p.meter != nil {
+		p.trafficConn.SetMeter(p.meter)
+	}
 
 	// if no proxy, just throw away the request
 	if rule == nil || firstProxy == nil || *firstProxy.Type == config.ProxyNone {
@@ -373,6 +375,9 @@ func (p *Process) closeChannels(clientChannel, proxyChannel *message.ProxyReques
 	p.trace("close channels")
 	p.closeChannel(clientChannel)
 	p.closeChannel(proxyChannel)
+	if p.meter != nil {
+		p.runtime.traffic.Remove(p.meter)
+	}
 	return nil
 }
 
