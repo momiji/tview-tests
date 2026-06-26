@@ -163,3 +163,12 @@ port is stabilized.
   rows are never marked Removed, so RemoveDead never drops them. Faithful to
   the original; fix by reusing one row per connection or removing on each
   iteration.
+
+## internal/ui (step 14b)
+
+- **Dropped text/UI live toggle.** The original switched between plain logs
+  and the table with space, via a suspendable log writer and a state machine.
+  This port only does "table with --ui, logs otherwise". Reintroduce the
+  toggle if needed (and the suspend-aware printer writer).
+- **Old demo packages removed.** The clock/tui/textmode demo and
+  service/clock were deleted as superseded by the proxy.

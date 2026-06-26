@@ -1,7 +1,10 @@
 # Architecture
 
-A small demo app that prints the current date/time every 2 seconds, with two
-front ends: plain console and a `tview`-based TUI that can be toggled live.
+A Kerberos-authenticating HTTP/1.1 and SOCKS5 proxy. It exposes a local
+anonymous proxy that forwards requests to upstream proxies/servers,
+automatically injecting the required credentials (Kerberos/Negotiate, Basic,
+or SOCKS auth), and also serves a generated `proxy.pac`. Which upstream to use
+per request is decided by configurable rules and PAC scripts.
 
 This file stays high-level. Each package's detailed design lives in its own
 `README.md`, linked from the package list below.
@@ -9,68 +12,87 @@ This file stays high-level. Each package's detailed design lives in its own
 ## Layout
 
 ```
-cmd/tview-tests/   the binary's entrypoint (flag parsing, signal context)
+cmd/kpx/           the binary's entry point (app metadata, calls app.Main)
 internal/
-  app/             orchestrator: creates the shared components, starts them,
-                   runs whichever mode main asked for, waits for shutdown
-  ui/              everything that presents the clock to a human
-    textmode/      raw-mode single-key console input
-    tui/           the tview full-screen UI
-  service/         standalone background components, not UI-specific
-    clock/         the core "current time" value
+  app/             wiring: parse CLI, load config, build services, run
+  cli/             flags -> config.CmdArgs + action; usage/help text
+  config/          three-layer config model + load/check/build + watch
+  proxy/           the proxy engine
+    server/        inbound listeners (HTTP + SOCKS5), ACL, accept loop
+    processor/     per-connection handling, split by axes (connector /
+                   authenticator / transport brick) + the Runtime
+    router/        runtime matching (rule + PAC) and proxy.pac generation
+    upstream/      upstream proxy/host selection with failover (HA)
+    message/       raw HTTP message read/parse/write
+    transport/     TCP tuning, byte-counting conn, chunked codec
+  service/         standalone, UI-agnostic components
+    cert/          self-signed CA + per-host certs (MITM)
+    kerberos/      SPNEGO tokens (password cache + native OS SSO)
+    secret/        config password encryption
+    pac/           PAC script evaluation (goja)
     printer/       the toggleable, asynchronous stdout writer
-    pac/           PAC (Proxy Auto-Configuration) script evaluation
+  ui/              the optional tview traffic table (--ui)
+    traffic/       the per-connection traffic model (UI-agnostic)
+  update/          optional self-update
 ```
 
-`service/` is where future non-UI components (config, a socket/net server,
-etc.) would go; `ui/` is where future *presentation* modes would go. Both
-groups exist as of this writing with exactly the components above — the
-split is there so the boundary is already in place before anything new
-needs to pick a side. Components under `service/` are the ones expected to
-eventually need real infrastructure (e.g. a docker-compose stack) for
-integration testing; `clock` and `printer` themselves don't need any.
+The domain (`config`, `proxy/*`, `service/*`) never depends on the UI: it
+receives its collaborators (a `*printer.Printer`, a `cert.Manager`, a
+`kerberos.Store`, a `TrafficSink`) by injection. The resolved configuration
+is immutable after build and published atomically, so a hot-reload swaps a
+whole new snapshot rather than mutating the live one.
 
 ## Run modes
 
 ```
-go run ./cmd/tview-tests            # plain console mode (default)
-go run ./cmd/tview-tests --ui        # UI mode: starts in text mode, auto-switches to tview UI after 3s
+kpx                          # use kpx.yaml / kpx.json in the working dir
+kpx -c config.yaml           # use an explicit config file
+kpx -u user@domain proxy:8080   # single upstream proxy, no config file
+kpx -e                       # encrypt a password (prints encrypted: ...)
+kpx --ui                     # run with the live tview traffic table
 ```
 
-| Mode                | How to enter                              | How to leave                          |
-|---------------------|--------------------------------------------|----------------------------------------|
-| Console (no `--ui`) | default                                    | Ctrl-C (process signal)                |
-| `--ui` text mode    | when `--ui` starts; or pressing **space** while in UI mode | press **space** → UI mode; 3s startup timer → UI mode (first time only); `q`/`Q`/Ctrl-C → quit |
-| `--ui` UI mode      | automatically 3s after startup if nothing else happens first; or pressing **space** while in text mode | press **space** → text mode; `q`/`Q`/Ctrl-C → quit |
+| Form                | What it does                                        |
+|---------------------|-----------------------------------------------------|
+| config file         | full rules/proxies/credentials; hot-reloaded on change |
+| single proxy arg    | one upstream (kerberos if `-u`, else anonymous, or direct if port 0), auto-exits after `--timeout` |
+| `-e`                | encrypt a password with the key file, then exit     |
+| `--ui`              | render the traffic table; `q`/`Q`/Ctrl-C quits      |
 
-`--ui` mode **always starts in text mode**, then auto-switches to the tview
-UI on a startup timer (or sooner, on space). After that first transition,
-space toggles between the two for as long as the app runs. Quitting from
-either mode (`q`/`Q`/Ctrl-C) always leaves the terminal back in normal
-console state before the process exits. See
-[internal/app/README.md](internal/app/README.md) and
-[internal/ui/README.md](internal/ui/README.md) for how that's wired.
+Shutdown is by context cancellation: a signal (SIGINT/SIGTERM), the auto-exit
+timeout, or a self-update restart all cancel the runtime context, which stops
+the listeners and the background tasks.
 
-## Core idea: one stored value, one push consumer, one pull consumer
+## Core idea: listen → match → select → authenticate → forward
 
-The thing the app actually *does* — refresh "now" every 2 seconds — lives in
-`internal/service/clock`. It *pushes* every update to a `printer.Printer`
-(which decides whether that's actually visible), while the UI instead
-*pulls* the value on its own schedule. Neither consumer needs the clock to
-know about modes. Details and rationale:
-[internal/service/clock/README.md](internal/service/clock/README.md).
+Each accepted connection is handled by one `processor.Process` (one goroutine,
+plus one extra for the duplex pipe). The flow:
 
 ```
-                 ┌──────────────┐
-                 │  clock.Clock  │  every tickInterval: now = time.Now(); p.Println(now)
-                 │  (stores now) │
-                 └──────┬────────┘
-            pushed via  │              polled via
-            Run(ctx, p)  │              Now()
-                         ▼                   ▲
-              printer.Printer.Println   tui's own ticker (refreshInterval)
-              (no-op when Disabled)      reads clk.Now(), redraws TextView
+  client ──▶ server (HTTP/SOCKS listener, ACL)
+                │  one Process per connection
+                ▼
+        read request (message)
+                │
+                ▼
+        router.Match ──▶ rule + candidate upstream proxies   (PAC resolved here)
+                │
+                ▼
+        upstream.FindFirstProxy ──▶ first reachable proxy/host (failover)
+                │
+                ▼
+        connector (direct / http-forward / socks)   axis A
+          + authenticator (kerberos / basic / socks) axis B
+                │
+                ▼
+        transport brick (http / tunnel / mitm)       axis C  ──▶ upstream
 ```
+
+The connection pool and per-connection idle timeouts of the original were
+dropped: each request dials fresh and client-side keep-alive is preserved by
+the processor loop. Byte counts flow to a `TrafficSink` (a no-op unless the
+`--ui` traffic table is attached). See
+[internal/proxy/processor/README.md](internal/proxy/processor/README.md).
 
 ## Packages
 
@@ -81,17 +103,11 @@ know about modes. Details and rationale:
   upstream), start the listeners, and drive hot-reload and self-update.
 - [internal/cli](internal/cli/README.md) — parses flags into `config.CmdArgs`
   and an action (run / help / version / encrypt); owns the usage/help text.
-- [internal/ui](internal/ui/README.md) — plain console mode, the `--ui`
-  mode-switching loop, and:
-  - [internal/ui/textmode](internal/ui/textmode/README.md) — raw-mode,
-    single-key console input (space / q / Q / Ctrl-C / external switch
-    signal). The only package with OS-specific implementations
-    (Linux/macOS vs. Windows).
-  - [internal/ui/tui](internal/ui/tui/README.md) — the tview-based
-    full-screen UI.
-- [internal/service/clock](internal/service/clock/README.md) — owns and
-  refreshes the current time, pushing it to a printer and exposing it for
-  the UI to pull.
+- [internal/ui](internal/ui/README.md) — the optional `--ui` tview traffic
+  table, with:
+  - [internal/ui/traffic](internal/ui/traffic/README.md) — the
+    per-connection traffic model (byte-rate rows + table) that the proxy
+    feeds and the table renders; UI-agnostic.
 - [internal/service/printer](internal/service/printer/README.md) — the
   dedicated, disableable, asynchronous stdout writer (own background
   worker + queue, with a `Flush` for graceful handoffs/shutdown), plus

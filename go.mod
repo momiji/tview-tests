@@ -16,6 +16,7 @@ require (
 
 require (
 	github.com/dlclark/regexp2 v1.11.4 // indirect
+	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/enterprizesoftware/rate-counter v0.0.0-20231214045714-3538d92854e2 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/gdamore/encoding v1.0.1 // indirect

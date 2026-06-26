@@ -9,6 +9,8 @@ github.com/dlclark/regexp2 v1.11.4 h1:rPYF9/LECdNymJufQKmri9gV604RvvABwgOA8un7yA
 github.com/dlclark/regexp2 v1.11.4/go.mod h1:DHkYz0B9wPfa6wondMfaivmHpzrQ3v9q8cnmRbL6yW8=
 github.com/dop251/goja v0.0.0-20251103110321-7516b814d492 h1:8Z1EWdAZxQRZBlh5gPjxaLxI8sv+RncUEddVhCLmeyI=
 github.com/dop251/goja v0.0.0-20251103110321-7516b814d492/go.mod h1:MxLav0peU43GgvwVgNbLAj1s/bSGboKkhuULvq/7hx4=
+github.com/dustin/go-humanize v1.0.1 h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkpeCY=
+github.com/dustin/go-humanize v1.0.1/go.mod h1:Mu1zIs6XwVuF/gI1OepvI0qD18qycQx+mFykh5fBlto=
 github.com/enterprizesoftware/rate-counter v0.0.0-20231214045714-3538d92854e2 h1:pmJVaDt4OD4QDAF2fgPDIip3smqeZ60JdduZWkf8Wr8=
 github.com/enterprizesoftware/rate-counter v0.0.0-20231214045714-3538d92854e2/go.mod h1:Ppd32TJDARojOIb5jDOFt5MSAODf0HXBfG17Rugpabw=
 github.com/fsnotify/fsnotify v1.8.0 h1:dAwr6QBTBZIkG8roQaJjGof0pp0EeF+tNV7YBP3F/8M=

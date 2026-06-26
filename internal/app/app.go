@@ -27,6 +27,7 @@ import (
 	"test/internal/service/cert"
 	"test/internal/service/kerberos"
 	"test/internal/service/printer"
+	"test/internal/ui"
 	"test/internal/ui/traffic"
 	"test/internal/update"
 )
@@ -141,7 +142,17 @@ func run(ctx context.Context, args config.CmdArgs, meta cli.Meta, p *printer.Pri
 		go updateLoop(runtime, meta, disableAutoRestart, p)
 	}
 
-	return server.New(runtime, conf, p).Run(runtime.Context())
+	srv := server.New(runtime, conf, p)
+	if conf.ConsoleUI {
+		// the tview UI owns the terminal, so silence the async log writer and
+		// run the server in the background while the table is on screen
+		p.Disable()
+		go func() { _ = srv.Run(runtime.Context()) }()
+		err := ui.RunTraffic(runtime.Context(), trafficTable)
+		runtime.Stop()
+		return err
+	}
+	return srv.Run(runtime.Context())
 }
 
 // askCredentials prompts for the login/password of any used, non-per-user,
