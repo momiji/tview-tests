@@ -126,4 +126,7 @@ know about modes. Details and rationale:
 - [internal/proxy/processor](internal/proxy/processor/README.md) — handles a
   single connection: match, authenticate, dial and forward, split by axes
   (connector / authenticator / transport brick). Shutdown via context, no
-  pool. (forward/socks connectors in progress.)
+  pool.
+- [internal/proxy/server](internal/proxy/server/README.md) — the inbound
+  listeners (HTTP proxy + SOCKS5), ACL enforcement and accept loop; hands
+  each connection to a processor. Shuts down on context cancellation.
