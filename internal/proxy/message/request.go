@@ -31,6 +31,22 @@ func NewProxyRequest(conn net.Conn, p *printer.Printer, prefix string) *ProxyReq
 	return &ProxyRequest{conn: conn, printer: p, prefix: prefix}
 }
 
+// SetPrefix changes the header-logging prefix (empty disables logging).
+func (r *ProxyRequest) SetPrefix(prefix string) {
+	r.prefix = prefix
+}
+
+// Conn returns the underlying connection (used for raw piping).
+func (r *ProxyRequest) Conn() net.Conn {
+	return r.conn
+}
+
+// SetConn replaces the underlying connection, e.g. to wrap it in TLS for a
+// CONNECT upgrade or MITM.
+func (r *ProxyRequest) SetConn(conn net.Conn) {
+	r.conn = conn
+}
+
 func (r *ProxyRequest) injectHeaders(headers []string) (*RequestHeader, error) {
 	if r.prefix != "" {
 		for _, header := range headers {

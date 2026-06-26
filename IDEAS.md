@@ -10,6 +10,7 @@ port is stabilized.
 
 - Check if project is now usable as a library, and identify what needs to be enhanced to do so, like changeing the printer fmp.Printf with a customizable Println func and a default printer implement that just do ft.Print
 - Add an option to cache pac js, userfull maybe for servers usage?
+- add ha to rule, pac, proxy, global: for roundrobin, first, faste, upstraem > service ?
 
 ## internal/service/secret (step 1, from kpx/password.go)
 
@@ -111,3 +112,19 @@ port is stabilized.
 - **`proxyShortName` duplicated** (also needed by the processor); share it.
 - **HA state never trimmed.** `lastProxies` grows with proxy/host keys and is
   never cleaned; fine for small configs, revisit for churny ones.
+
+## internal/proxy/processor (step 9, from kpx/process.go)
+
+- **Diagnostic header rename.** The debug-mode response headers (old product-
+  prefixed `*-proxy`/`*-host`) are now `x-proxy-name`/`x-proxy-host` to avoid
+  a product name literal in code. Once the app name/meta is migrated, tie the
+  prefix to it (configurable) and restore the intended names.
+- **`authorizationContext` is dead without the pool.** The per-conf/per-user
+  auth still computes an `authorizationContext` (was the pool key); with the
+  pool gone it is unused (`_ = authorizationContext`). Drop it from the auth
+  signatures once forward/socks are ported.
+- **`splitHostPort`/`proxyShortName` duplicated** again here; fold into a
+  shared util at the CLI step.
+- **Traffic rows are not registered.** `TrafficRow` implements the meter but
+  is not added to a table; wire it to the UI table at step 14 (and deregister
+  on close).

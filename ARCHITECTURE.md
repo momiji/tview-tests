@@ -123,3 +123,7 @@ know about modes. Details and rationale:
 - [internal/proxy/upstream](internal/proxy/upstream/README.md) — selects the
   reachable upstream proxy/host for a request (failover + HA), remembering
   the last reachable one outside the immutable config.
+- [internal/proxy/processor](internal/proxy/processor/README.md) — handles a
+  single connection: match, authenticate, dial and forward, split by axes
+  (connector / authenticator / transport brick). Shutdown via context, no
+  pool. (forward/socks connectors in progress.)

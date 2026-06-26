@@ -58,7 +58,7 @@ func (ks *Store) safeRemoveClient(key string) {
 }
 
 // safeTryLogin logs in with the given credentials, only if not yet logged in.
-func (ks *Store) safeTryLogin(username, realm, password string, force bool) (*Client, error) {
+func (ks *Store) SafeTryLogin(username, realm, password string, force bool) (*Client, error) {
 	// create key
 	key := ks.clientKey(username, realm, password)
 	// remove client to force login?
@@ -88,8 +88,8 @@ func (ks *Store) safeTryLogin(username, realm, password string, force bool) (*Cl
 	return kcl, nil
 }
 
-func (ks *Store) safeGetToken(username, realm, password, protocol string, host string) (*string, error) {
-	kcl, err := ks.safeTryLogin(username, realm, password, false)
+func (ks *Store) SafeGetToken(username, realm, password, protocol string, host string) (*string, error) {
+	kcl, err := ks.SafeTryLogin(username, realm, password, false)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "unable to login to kerberos")
 	}
@@ -98,7 +98,7 @@ func (ks *Store) safeGetToken(username, realm, password, protocol string, host s
 	}
 	token, err := kcl.safeGetToken(protocol, host)
 	if err != nil {
-		kcl, err = ks.safeTryLogin(username, realm, password, true)
+		kcl, err = ks.SafeTryLogin(username, realm, password, true)
 		if kcl == nil {
 			return &noAuth, nil
 		}
