@@ -120,3 +120,6 @@ know about modes. Details and rationale:
 - [internal/proxy/router](internal/proxy/router/README.md) — runtime
   matching: maps a request to a rule and its upstream proxies (resolving PAC
   scripts, caching per host), and generates the local `proxy.pac`.
+- [internal/proxy/upstream](internal/proxy/upstream/README.md) — selects the
+  reachable upstream proxy/host for a request (failover + HA), remembering
+  the last reachable one outside the immutable config.

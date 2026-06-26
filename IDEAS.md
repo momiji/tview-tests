@@ -102,3 +102,12 @@ port is stabilized.
 - **Host cache never invalidated.** Entries live for the router's lifetime;
   a config reload builds a new router, but long-lived routers never expire
   stale host→proxy decisions.
+
+## internal/proxy/upstream (step 8, from kpx/process.go findFirstProxy)
+
+- **In-place sort aliases the caller's slice.** `append(proxies[:0],
+  proxies...)` + `sort` reorders the router's cached proxy slice. Copy before
+  sorting to avoid the shared-state hazard.
+- **`proxyShortName` duplicated** (also needed by the processor); share it.
+- **HA state never trimmed.** `lastProxies` grows with proxy/host keys and is
+  never cleaned; fine for small configs, revisit for churny ones.
