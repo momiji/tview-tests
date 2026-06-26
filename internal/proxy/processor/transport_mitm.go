@@ -50,7 +50,7 @@ func (p *Process) transportMitm(clientChannel, proxyChannel *message.ProxyReques
 		if p.verbose {
 			p.runtime.printer.Infof("%s", p.logLine)
 		}
-		if p.runtime.conf.Debug {
+		if p.conf.Debug {
 			prefix := fmt.Sprintf("%s C<", p.logPrefix)
 			for _, header := range clientChannel.Header.Headers {
 				p.runtime.printer.ReqHeaderf("%s %s", prefix, header)
@@ -60,7 +60,7 @@ func (p *Process) transportMitm(clientChannel, proxyChannel *message.ProxyReques
 		if err != nil {
 			break
 		}
-		if p.runtime.conf.Debug {
+		if p.conf.Debug {
 			proxyChannel.SetPrefix(fmt.Sprintf("%s P<", p.logPrefix))
 		}
 		err = proxyChannel.ReadResponseHeaders(true)

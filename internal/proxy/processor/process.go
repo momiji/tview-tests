@@ -13,14 +13,21 @@ import (
 
 	"test/internal/config"
 	"test/internal/proxy/message"
+	"test/internal/proxy/router"
 	"test/internal/proxy/transport"
+	"test/internal/proxy/upstream"
 	"test/internal/service/printer"
 )
 
 // Process handles a single client connection. It is single-threaded (one
 // goroutine), except for the duplex pipe which uses two.
 type Process struct {
-	runtime     *Runtime
+	runtime *Runtime
+	// snapshot captured at creation, so a mid-connection reload does not change
+	// the config/router/selector under a running Process
+	conf        *config.ProxyConf
+	router      *router.Router
+	selector    *upstream.Selector
 	conn        net.Conn // client connection (a transport.TrafficConn)
 	trafficConn *transport.TrafficConn
 	reqId       int32
@@ -39,8 +46,12 @@ func NewProcess(runtime *Runtime, conn net.Conn) *Process {
 	reqId := runtime.newReqId()
 	ti := printer.NewReqLogInfo(reqId, "process")
 	trafficConn := transport.NewTrafficConn(conn)
+	snap := runtime.current.Load()
 	return &Process{
 		runtime:     runtime,
+		conf:        snap.conf,
+		router:      snap.router,
+		selector:    snap.selector,
 		conn:        trafficConn,
 		trafficConn: trafficConn,
 		reqId:       reqId,
@@ -50,7 +61,7 @@ func NewProcess(runtime *Runtime, conn net.Conn) *Process {
 }
 
 func (p *Process) trace(format string, args ...interface{}) {
-	if p.runtime.conf.Trace {
+	if p.conf.Trace {
 		p.runtime.printer.ReqInfof(p.ti, format, args...)
 	}
 }
@@ -77,7 +88,7 @@ func (p *Process) processChannel(clientChannel, proxyChannel *message.ProxyReque
 	clientChannel.SetPrefix("")
 
 	// set timeout for reading headers - prevent waiting forever for incoming http headers
-	_ = p.conn.SetReadDeadline(time.Now().Add(time.Duration(p.runtime.conf.ConnectTimeout) * time.Second))
+	_ = p.conn.SetReadDeadline(time.Now().Add(time.Duration(p.conf.ConnectTimeout) * time.Second))
 
 	err := clientChannel.ReadRequestHeaders()
 	if err != nil {
@@ -99,8 +110,8 @@ func (p *Process) processChannel(clientChannel, proxyChannel *message.ProxyReque
 
 	// find proxy to use from host:port
 	p.trace("proxy match")
-	rule, proxies := p.runtime.router.MatchHttp(clientChannel.Header.Url, clientChannel.Header.HostPort)
-	firstProxy, firstHostPort := p.runtime.selector.FindFirstProxy(rule, proxies)
+	rule, proxies := p.router.MatchHttp(clientChannel.Header.Url, clientChannel.Header.HostPort)
+	firstProxy, firstHostPort := p.selector.FindFirstProxy(rule, proxies)
 	if firstProxy != nil {
 		p.trace("proxy matched '%s'", firstProxy.Name)
 	} else {
@@ -112,7 +123,7 @@ func (p *Process) processChannel(clientChannel, proxyChannel *message.ProxyReque
 	if p.verbose {
 		p.runtime.printer.Infof("%s", p.logLine)
 	}
-	if p.runtime.conf.Debug {
+	if p.conf.Debug {
 		prefix := fmt.Sprintf("%s C<", p.logPrefix)
 		for _, header := range clientChannel.Header.Headers {
 			p.runtime.printer.ReqHeaderf("%s %s", prefix, header)
@@ -221,7 +232,7 @@ func (p *Process) processChannel(clientChannel, proxyChannel *message.ProxyReque
 					p.runtime.printer.Errorf("%s => forward: %#s", p.logLine, err)
 					return p.closeChannels(clientChannel, proxyChannel)
 				}
-				if p.runtime.conf.Debug {
+				if p.conf.Debug {
 					proxyChannel.SetPrefix(fmt.Sprintf("%s P<", p.logPrefix))
 				}
 				err = proxyChannel.ReadResponseHeaders(false)
@@ -234,7 +245,7 @@ func (p *Process) processChannel(clientChannel, proxyChannel *message.ProxyReque
 					p.runtime.printer.Errorf("%s => forward: %#s", p.logLine, err)
 					return p.closeChannels(clientChannel, proxyChannel)
 				}
-				if p.runtime.conf.Debug {
+				if p.conf.Debug {
 					proxyChannel.SetPrefix(fmt.Sprintf("%s P>", p.logPrefix))
 				}
 				proxyChannel.SetConn(tls.Client(proxyChannel.Conn(), &tls.Config{ServerName: clientChannel.Header.Host}))
@@ -248,7 +259,7 @@ func (p *Process) processChannel(clientChannel, proxyChannel *message.ProxyReque
 
 		// read response headers
 		p.trace("read response")
-		if p.runtime.conf.Debug {
+		if p.conf.Debug {
 			proxyChannel.SetPrefix(fmt.Sprintf("%s P<", p.logPrefix))
 		}
 		if simulateConnect {
@@ -314,14 +325,14 @@ func (p *Process) computeLog(channel *message.ProxyRequest, rule *config.Rule, p
 		return
 	}
 	// compute verbosity: rule overrides proxy overrides conf, then debug/trace force on
-	verbose := p.runtime.conf.Verbose
+	verbose := p.conf.Verbose
 	if rule != nil && proxy != nil {
 		verbose = proxy.Verbose
 	}
 	if rule != nil {
 		verbose = rule.Verbose
 	}
-	verbose = verbose || p.runtime.conf.Debug || p.runtime.conf.Trace
+	verbose = verbose || p.conf.Debug || p.conf.Trace
 	p.verbose = verbose
 	// compute proxy display name
 	name := config.ProxyNone.Name()
@@ -355,7 +366,7 @@ func (p *Process) webServer(channel *message.ProxyRequest) error {
 	if err != nil {
 		return err // no wrap
 	}
-	return channel.WriteContent(p.runtime.router.Pac(), false, message.CT_PLAIN_UTF8)
+	return channel.WriteContent(p.router.Pac(), false, message.CT_PLAIN_UTF8)
 }
 
 func (p *Process) closeChannels(clientChannel, proxyChannel *message.ProxyRequest) *message.ProxyRequest {

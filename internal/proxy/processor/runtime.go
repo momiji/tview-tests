@@ -18,14 +18,23 @@ import (
 	"test/internal/service/printer"
 )
 
-// Runtime bundles the shared services a Process needs and carries the
-// shutdown context. It replaces the old Proxy's runtime aspects (the
-// listeners live in the server package). Shutdown is by context cancellation
-// instead of os.Exit.
-type Runtime struct {
+// snapshot is the hot-reloadable part of the runtime: the resolved config and
+// the components derived from it. It is published atomically so a reload
+// swaps a whole new snapshot at once, and each Process captures the snapshot
+// it started with.
+type snapshot struct {
 	conf     *config.ProxyConf
 	router   *router.Router
 	selector *upstream.Selector
+}
+
+// Runtime bundles the shared services a Process needs and carries the
+// shutdown context. It replaces the old Proxy's runtime aspects (the
+// listeners live in the server package). Shutdown is by context cancellation
+// instead of os.Exit. The config/router/selector are swapped atomically on
+// reload; the kerberos store, cert manager and printer are stable.
+type Runtime struct {
+	current  atomic.Pointer[snapshot]
 	kerberos *kerberos.Store
 	certs    *cert.Manager
 	printer  *printer.Printer
@@ -38,17 +47,26 @@ type Runtime struct {
 
 func NewRuntime(ctx context.Context, conf *config.ProxyConf, rt *router.Router, sel *upstream.Selector, krb *kerberos.Store, certs *cert.Manager, p *printer.Printer) *Runtime {
 	ctx, cancel := context.WithCancel(ctx)
-	return &Runtime{
-		conf:     conf,
-		router:   rt,
-		selector: sel,
+	r := &Runtime{
 		kerberos: krb,
 		certs:    certs,
 		printer:  p,
 		ctx:      ctx,
 		cancel:   cancel,
 	}
+	r.current.Store(&snapshot{conf: conf, router: rt, selector: sel})
+	return r
 }
+
+// Reload publishes a new config/router/selector snapshot and bumps the load
+// counter, so connections started before the reload are not reused after it.
+func (r *Runtime) Reload(conf *config.ProxyConf, rt *router.Router, sel *upstream.Selector) {
+	r.current.Store(&snapshot{conf: conf, router: rt, selector: sel})
+	r.loadCounter.Add(1)
+}
+
+// Conf returns the current resolved config (the latest published snapshot).
+func (r *Runtime) Conf() *config.ProxyConf { return r.current.Load().conf }
 
 // Certs exposes the certificate manager (may be nil when no rule uses MITM).
 func (r *Runtime) Certs() *cert.Manager { return r.certs }

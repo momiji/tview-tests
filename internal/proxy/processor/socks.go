@@ -52,8 +52,8 @@ func (p *Process) ProcessSocks(request *socks5.Request) {
 
 	// find matching rule and proxy
 	requestHostPort := request.Address()
-	rule, proxies := p.runtime.router.MatchSocks(requestHostPort)
-	firstProxy, firstHostPort := p.runtime.selector.FindFirstProxy(rule, proxies)
+	rule, proxies := p.router.MatchSocks(requestHostPort)
+	firstProxy, firstHostPort := p.selector.FindFirstProxy(rule, proxies)
 	proxyName := "none"
 	if firstProxy != nil {
 		proxyName = firstProxy.Name
@@ -69,14 +69,14 @@ func (p *Process) ProcessSocks(request *socks5.Request) {
 	}
 
 	// verbosity
-	verbose := p.runtime.conf.Verbose
+	verbose := p.conf.Verbose
 	if rule != nil && firstProxy != nil {
 		verbose = firstProxy.Verbose
 	}
 	if rule != nil {
 		verbose = rule.Verbose
 	}
-	verbose = verbose || p.runtime.conf.Debug || p.runtime.conf.Trace
+	verbose = verbose || p.conf.Debug || p.conf.Trace
 	p.verbose = verbose
 
 	// verbose log
@@ -112,7 +112,7 @@ func (p *Process) ProcessSocks(request *socks5.Request) {
 		p.trace("start connection (retryable=%d)", retryable)
 		var conn net.Conn
 		dialer := new(net.Dialer)
-		dialer.Timeout = time.Duration(p.runtime.conf.ConnectTimeout) * time.Second
+		dialer.Timeout = time.Duration(p.conf.ConnectTimeout) * time.Second
 		switch *firstProxy.Type {
 		case config.ProxySocks:
 			var authz *netproxy.Auth

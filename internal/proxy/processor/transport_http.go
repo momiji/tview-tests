@@ -19,7 +19,7 @@ const debugHeaderPrefix = "x-proxy"
 // request line, filtered headers, optional Proxy-Authorization, then the body.
 func (p *Process) forwardRequest(clientChannel *message.ProxyRequest, proxyChannel *message.ProxyRequest, proxyType config.ProxyType, auth *string) error {
 	var err error
-	if p.runtime.conf.Debug {
+	if p.conf.Debug {
 		proxyChannel.SetPrefix(fmt.Sprintf("%s P>", p.logPrefix))
 	}
 	// request line must use absoluteUri when the target is a proxy
@@ -72,7 +72,7 @@ func (p *Process) forwardRequest(clientChannel *message.ProxyRequest, proxyChann
 // direct-to-CONNECT upgrade, /~/ path).
 func (p *Process) forwardConnect(clientChannel *message.ProxyRequest, proxyChannel *message.ProxyRequest, _ config.ProxyType, auth *string) error {
 	var err error
-	if p.runtime.conf.Debug {
+	if p.conf.Debug {
 		proxyChannel.SetPrefix(fmt.Sprintf("%s P>", p.logPrefix))
 	}
 	err = proxyChannel.WriteRequestLine("CONNECT", clientChannel.Header.HostPort, clientChannel.Header.Version)
@@ -113,7 +113,7 @@ func (p *Process) forwardConnect(clientChannel *message.ProxyRequest, proxyChann
 // http), filtering hop-by-hop headers and the diagnostic headers.
 func (p *Process) forwardResponse(proxyChannel *message.ProxyRequest, clientChannel *message.ProxyRequest, authentication bool) error {
 	var err error
-	if p.runtime.conf.Debug {
+	if p.conf.Debug {
 		clientChannel.SetPrefix(fmt.Sprintf("%s C>", p.logPrefix))
 	}
 	for _, header := range proxyChannel.Header.Headers {
@@ -125,7 +125,7 @@ func (p *Process) forwardResponse(proxyChannel *message.ProxyRequest, clientChan
 			continue
 		case strings.HasPrefix(lower, "proxy-authenticate:") && authentication:
 			continue
-		case strings.HasPrefix(lower, debugHeaderPrefix+"-") && p.runtime.conf.Debug:
+		case strings.HasPrefix(lower, debugHeaderPrefix+"-") && p.conf.Debug:
 			continue
 		}
 		err = clientChannel.WriteHeaderLine(header)
@@ -133,7 +133,7 @@ func (p *Process) forwardResponse(proxyChannel *message.ProxyRequest, clientChan
 			return err // no wrap
 		}
 	}
-	if p.runtime.conf.Debug {
+	if p.conf.Debug {
 		_ = clientChannel.WriteHeader(debugHeaderPrefix+"-name", p.logName)
 		_ = clientChannel.WriteHeader(debugHeaderPrefix+"-host", p.logHostPort)
 	}

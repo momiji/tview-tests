@@ -25,7 +25,7 @@ func errNotMigrated(what string) error {
 // that do not speak HTTP, i.e. direct/socks tunnels).
 func (p *Process) connectUpstream(client *message.ProxyRequest, firstProxy *config.Proxy, firstHostPort string, rule *config.Rule, authentication bool, authFunc func() (*string, error), authorization **string) (net.Conn, bool, error) {
 	dialer := new(net.Dialer)
-	dialer.Timeout = time.Duration(p.runtime.conf.ConnectTimeout) * time.Second
+	dialer.Timeout = time.Duration(p.conf.ConnectTimeout) * time.Second
 	switch *firstProxy.Type {
 	case config.ProxyDirect:
 		return p.connectDirect(client, rule, firstProxy, dialer)

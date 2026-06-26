@@ -128,3 +128,13 @@ port is stabilized.
 - **Traffic rows are not registered.** `TrafficRow` implements the meter but
   is not added to a table; wire it to the UI table at step 14 (and deregister
   on close).
+
+## internal/config watch + processor reload (step 11)
+
+- **Reload feasibility lives in the app callback.** `config.Watch` is generic
+  (trigger on change/periodic); the mod-time gating, credential hot-reload
+  check (old kpx `reload()`), and `runtime.Reload` publishing are wired in the
+  app layer (step 13). Make sure the callback honors `router.NeedFastReload()`.
+- **Kerberos/cert not swapped on reload.** Only conf/router/selector are
+  republished; the kerberos store and cert manager are kept across reloads
+  (as before). Revisit if krb5 config or MITM rules change on reload.
