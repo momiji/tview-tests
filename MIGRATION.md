@@ -258,11 +258,24 @@ internal/proxy/processor/
 
 Chaque processeur reste court : il établit la connexion amont (axe A, avec
 l'auth de l'axe B) puis délègue à une brique de transport (axe C). C'est le
-remplacement direct des deux grosses méthodes actuelles. **À valider avant
-de coder** (phase 1 de `CLAUDE.md`) : on peut aussi partir sur « un fichier
-strictement par type » (none/direct/forward/socks) avec le mode en
-paramètre interne — plus proche de la demande littérale « un fichier par
-type de proxy », au prix de fonctions un peu plus longues.
+remplacement direct des deux grosses méthodes actuelles.
+
+**Décision validée : décomposition par axes** (l'arborescence ci-dessus),
+pas « un fichier strictement par type ». On vise l'architecture cible avec
+briques de transport réutilisables et auth orthogonale.
+
+**Étapes 9 et 10 traitées ensemble** : le processeur (`process.go`) et
+l'orchestrateur (`proxy.go`) sont mutuellement dépendants (l'orchestrateur
+crée des processeurs ; le processeur appelle `stopped()`/`getConfig()`/
+`newRequestId`), et ne compilent qu'ensemble une fois retirés le pool et
+`TimedConn` (§5). Sous-découpage de l'implémentation (chaque sous-commit
+doit compiler) : (9a) dispatch + orchestrateur minimal (shutdown `context`,
+amorce de l'étape 11) + `none`/`direct` + un `TrafficRow` minimal
+implémentant `transport.TrafficMeter` (amorce de l'étape 14) ; (9b)
+`forward` + `authenticator` (issu de `computeAuthPerConf`/`computeAuthPerUser`) ;
+(9c) `transport_tunnel`/`transport_mitm` ; (9d) entrée SOCKS (`processSocks`
++ `TCPHandle`). Puis (10) finalise l'orchestrateur (listeners HTTP/SOCKS,
+ACL, boucle `Accept`).
 
 ### 3.5 Classification à l'entrée : web PAC local et demux HTTP/SOCKS
 
