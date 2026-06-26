@@ -31,7 +31,9 @@ internal/
     secret/        config password encryption
     pac/           PAC script evaluation (goja)
     printer/       the toggleable, asynchronous stdout writer
-  ui/              the optional tview traffic table (--ui)
+  ui/              the optional interactive terminal UI (--ui): text-mode
+                   log with a live toggle to the tview traffic table
+    textmode/      raw-mode single-keypress input for the text-mode side
     traffic/       the per-connection traffic model (UI-agnostic)
   update/          optional self-update
 ```
@@ -49,7 +51,7 @@ kpx                          # use kpx.yaml / kpx.json in the working dir
 kpx -c config.yaml           # use an explicit config file
 kpx -u user@domain proxy:8080   # single upstream proxy, no config file
 kpx -e                       # encrypt a password (prints encrypted: ...)
-kpx --ui                     # run with the live tview traffic table
+kpx --ui                     # interactive: proxy log, space toggles the table
 ```
 
 | Form                | What it does                                        |
@@ -57,7 +59,7 @@ kpx --ui                     # run with the live tview traffic table
 | config file         | full rules/proxies/credentials; hot-reloaded on change |
 | single proxy arg    | one upstream (kerberos if `-u`, else anonymous, or direct if port 0), auto-exits after `--timeout` |
 | `-e`                | encrypt a password with the key file, then exit     |
-| `--ui`              | render the traffic table; `q`/`Q`/Ctrl-C quits      |
+| `--ui`              | start in the scrolling proxy log, space toggles to the live traffic table; `q`/`Q`/Ctrl-C quits |
 
 Shutdown is by context cancellation: a signal (SIGINT/SIGTERM), the auto-exit
 timeout, or a self-update restart all cancel the runtime context, which stops

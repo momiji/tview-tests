@@ -144,11 +144,11 @@ func run(ctx context.Context, args config.CmdArgs, meta cli.Meta, p *printer.Pri
 
 	srv := server.New(runtime, conf, p)
 	if conf.ConsoleUI {
-		// the tview UI owns the terminal, so silence the async log writer and
-		// run the server in the background while the table is on screen
-		p.Disable()
+		// run the server in the background while the interactive UI (text mode
+		// with a toggle to the tview traffic table) owns the terminal; RunUI
+		// disables/re-enables the async log writer as it switches modes
 		go func() { _ = srv.Run(runtime.Context()) }()
-		err := ui.RunTraffic(runtime.Context(), trafficTable)
+		err := ui.RunUI(runtime.Context(), trafficTable, p)
 		runtime.Stop()
 		return err
 	}

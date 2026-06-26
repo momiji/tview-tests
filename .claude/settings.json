@@ -3,7 +3,9 @@
     "allow": [
       "Bash(go doc *)",
       "Bash(go test *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(go mod *)"
     ]
   }
 }

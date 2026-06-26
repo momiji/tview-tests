@@ -166,9 +166,11 @@ port is stabilized.
 
 ## internal/ui (step 14b)
 
-- **Dropped text/UI live toggle.** The original switched between plain logs
-  and the table with space, via a suspendable log writer and a state machine.
-  This port only does "table with --ui, logs otherwise". Reintroduce the
-  toggle if needed (and the suspend-aware printer writer).
-- **Old demo packages removed.** The clock/tui/textmode demo and
-  service/clock were deleted as superseded by the proxy.
+- **Text/UI live toggle restored.** `--ui` starts in the scrolling proxy
+  log and toggles to the tview traffic table with space (`internal/ui`
+  `RunUI` + the `internal/ui/textmode` raw-mode reader, driving the
+  printer's `Disable`/`Enable`). The Windows reader (`run_windows.go`) is a
+  best-effort placeholder to be replaced with a known-good implementation.
+- **Old demo packages removed.** The clock/tui demo and service/clock were
+  deleted as superseded by the proxy; the textmode reader was kept and
+  rewired to drive the traffic table.

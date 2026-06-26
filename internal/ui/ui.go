@@ -1,11 +1,13 @@
 // Package ui renders the live traffic table in the terminal with tview, when
-// the proxy is started with --ui. It reads the shared traffic table and
-// refreshes a few times per second until the context is cancelled or the user
-// quits (q / Ctrl-C).
+// the proxy is started with --ui. It starts in plain-console text mode (the
+// printer keeps scrolling) and toggles to the tview traffic table on space,
+// reading the shared traffic table and refreshing a few times per second
+// until the context is cancelled or the user quits (q / Ctrl-C).
 package ui
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"strconv"
 	"strings"
@@ -16,8 +18,72 @@ import (
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 
+	"test/internal/service/printer"
+	"test/internal/ui/textmode"
 	"test/internal/ui/traffic"
 )
+
+// Signal is the reason RunTraffic returned.
+type Signal int
+
+const (
+	// SwitchToText means the user pressed space and wants the plain console.
+	SwitchToText Signal = iota
+	// Quit means the user pressed q/Q/Ctrl-C or the context was cancelled.
+	Quit
+)
+
+// preUIFlushTimeout bounds how long RunUI waits for the printer to drain
+// already-queued lines before handing the screen over to tview. It's a
+// best-effort cleanliness step (avoids the last console line racing with
+// tview's screen setup), not correctness-critical, hence the short cap.
+const preUIFlushTimeout = 200 * time.Millisecond
+
+// RunUI drives --ui mode on top of an already-started printer (see
+// app.run). It starts in text mode — the printer keeps scrolling the proxy
+// log — and switches to the tview traffic table when the user presses
+// space. From the table, space returns to text mode; the user can keep
+// toggling. q/Q/Ctrl-C quits from either mode, and a cancelled ctx (proxy
+// shutdown) unblocks whichever mode is on screen. Because tview's Stop()
+// and textmode's terminal restore both run before this returns, the
+// terminal is always left back in plain console state.
+func RunUI(ctx context.Context, data *traffic.TrafficTable, p *printer.Printer) error {
+	fmt.Println("[-] --ui: showing the proxy log; press space for the live traffic table (q/Ctrl-C to quit)")
+
+	for {
+		// text mode: the printer scrolls the log until space or quit.
+		textSig, err := textmode.Run(ctx, nil)
+		if err != nil {
+			return err
+		}
+		if textSig == textmode.Quit {
+			return nil
+		}
+
+		// switch to the tview table: silence the async printer and drain
+		// anything still queued so it does not race tview's screen setup.
+		p.Disable()
+		flushBeforeUI(ctx, p)
+		uiSig, err := RunTraffic(ctx, data)
+		p.Enable()
+		if err != nil {
+			return err
+		}
+		if uiSig == Quit {
+			return nil
+		}
+		// uiSig == SwitchToText: loop back into text mode.
+	}
+}
+
+// flushBeforeUI waits, briefly, for any already-queued printer lines to be
+// written before tview takes over the screen. Best-effort: if it doesn't
+// finish within preUIFlushTimeout, RunUI proceeds anyway.
+func flushBeforeUI(ctx context.Context, p *printer.Printer) {
+	ctx, cancel := context.WithTimeout(ctx, preUIFlushTimeout)
+	defer cancel()
+	_ = p.Flush(ctx)
+}
 
 const (
 	rowActive = iota
@@ -39,12 +105,13 @@ type renderer struct {
 	data   *traffic.TrafficTable
 }
 
-// RunTraffic displays the traffic table until ctx is cancelled or the user
-// quits. It blocks; the caller should run the proxy server in the background.
-func RunTraffic(ctx context.Context, data *traffic.TrafficTable) error {
+// RunTraffic displays the traffic table until the user presses space
+// (SwitchToText), quits with q/Q/Ctrl-C (Quit), or ctx is cancelled (Quit).
+// It blocks; the caller should run the proxy server in the background.
+func RunTraffic(ctx context.Context, data *traffic.TrafficTable) (Signal, error) {
 	screen, err := tcell.NewScreen()
 	if err != nil {
-		return err
+		return Quit, err
 	}
 	r := &renderer{screen: screen, data: data}
 	r.table = tview.NewTable().
@@ -55,13 +122,21 @@ func RunTraffic(ctx context.Context, data *traffic.TrafficTable) error {
 		SetSeparator(tview.Borders.Vertical)
 	r.table.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey { return nil })
 
+	// default to Quit; the space handler upgrades it to SwitchToText, and the
+	// ctx-cancellation path leaves it as Quit.
+	signal := Quit
 	r.app = tview.NewApplication().SetScreen(screen)
 	r.app.SetRoot(r.table, true)
 	r.app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		switch {
+		case event.Key() == tcell.KeyRune && event.Rune() == ' ':
+			signal = SwitchToText
+			r.app.Stop()
 		case event.Key() == tcell.KeyCtrlC:
+			signal = Quit
 			r.app.Stop()
 		case event.Key() == tcell.KeyRune && (event.Rune() == 'q' || event.Rune() == 'Q'):
+			signal = Quit
 			r.app.Stop()
 		}
 		return nil
@@ -89,7 +164,7 @@ func RunTraffic(ctx context.Context, data *traffic.TrafficTable) error {
 
 	err = r.app.Run()
 	close(done)
-	return err
+	return signal, err
 }
 
 func (r *renderer) update() {
