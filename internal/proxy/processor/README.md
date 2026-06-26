@@ -38,10 +38,9 @@ the rest of the app.
 
 ## Limitations
 
-- **`forward` and `socks` connectors are stubs** (steps 9b/9d). Today only
-  `none` and `direct` (http / tunnel / mitm) are wired; kerberos/basic/
-  anonymous/socks upstreams return "not yet migrated".
-- **SOCKS server entry not ported** (`processSocks` / `TCPHandle`, step 9d).
+- **Not yet wired into a server.** The listeners, ACL and accept loop
+  (`TCPHandle` for SOCKS) live in the `server` package (step 10); nothing
+  drives `ProcessHttp`/`ProcessSocks` until then.
 - **No traffic registry / UI table.** `TrafficRow` counts bytes but is not yet
   registered in a UI table (MIGRATION.md step 14); `closeChannels` does not
   deregister it.
