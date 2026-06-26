@@ -68,6 +68,13 @@ func (r *Runtime) Reload(conf *config.ProxyConf, rt *router.Router, sel *upstrea
 // Conf returns the current resolved config (the latest published snapshot).
 func (r *Runtime) Conf() *config.ProxyConf { return r.current.Load().conf }
 
+// Router returns the current router (latest published snapshot).
+func (r *Runtime) Router() *router.Router { return r.current.Load().router }
+
+// Context returns the runtime's shutdown context; the server uses it so that
+// Stop() (and the parent context) tears the listeners down too.
+func (r *Runtime) Context() context.Context { return r.ctx }
+
 // Certs exposes the certificate manager (may be nil when no rule uses MITM).
 func (r *Runtime) Certs() *cert.Manager { return r.certs }
 

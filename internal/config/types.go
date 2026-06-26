@@ -76,6 +76,7 @@ type CmdArgs struct {
 	Listen    string // overrides bind host:port
 	User      string // auto-fills missing credential logins
 	ACL       string // comma-separated list of allowed IPs/CIDRs
+	Timeout   int    // auto-exit after N seconds (single-proxy mode); 0 disables
 	Debug     bool
 	Trace     bool
 	Verbose   bool

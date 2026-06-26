@@ -144,3 +144,14 @@ port is stabilized.
 - **No checksum/signature verification** of the downloaded binary; add before
   trusting auto-update.
 - **amd64-only asset table**; extend to arm64 etc.
+
+## internal/cli + internal/app (step 13)
+
+- **Self-update restart no longer exits with code 200.** The old restarter
+  contract (exit 200) became a graceful runtime.Stop(); reintroduce an exit
+  code if an external supervisor relies on it.
+- **In-place config mutation at load/reload.** askCredentials and the reloader
+  set Login/Password on the resolved config; ties into the ProxyConf
+  immutability goal.
+- **Console UI (`--ui`) parsed but not wired** until the UI reconciliation
+  (step 14); the proxy runs in plain logging mode.

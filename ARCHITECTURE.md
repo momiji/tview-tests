@@ -74,9 +74,13 @@ know about modes. Details and rationale:
 
 ## Packages
 
-- [internal/app](internal/app/README.md) — the orchestrator: creates and
-  starts the shared `Clock`/`Printer`, runs the chosen mode, waits for
-  clean shutdown.
+- `cmd/kpx` — the binary entry point: defines the application metadata
+  (overridable via `-ldflags`) and calls `app.Main`.
+- [internal/app](internal/app/README.md) — wires everything and runs the
+  proxy: parse CLI, load config, build services (kerberos/cert/router/
+  upstream), start the listeners, and drive hot-reload and self-update.
+- [internal/cli](internal/cli/README.md) — parses flags into `config.CmdArgs`
+  and an action (run / help / version / encrypt); owns the usage/help text.
 - [internal/ui](internal/ui/README.md) — plain console mode, the `--ui`
   mode-switching loop, and:
   - [internal/ui/textmode](internal/ui/textmode/README.md) — raw-mode,
@@ -130,3 +134,6 @@ know about modes. Details and rationale:
 - [internal/proxy/server](internal/proxy/server/README.md) — the inbound
   listeners (HTTP proxy + SOCKS5), ACL enforcement and accept loop; hands
   each connection to a processor. Shuts down on context cancellation.
+- [internal/update](internal/update/README.md) — optional self-update: checks
+  the releases API and installs a newer binary in place, signaling a restart
+  (no `os.Exit`).

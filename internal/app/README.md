@@ -1,42 +1,42 @@
 # internal/app
 
-The orchestrator: creates the shared `Clock` and `Printer`, starts them,
-runs whichever mode `cmd/tview-tests/main.go` asked for, and waits for
-clean termination. All mode-specific behavior (console output, the
-`--ui` switching loop, textmode, tui) lives in [internal/ui](../ui/README.md)
-instead — `app` just wires things together. See
-[../../ARCHITECTURE.md](../../ARCHITECTURE.md) for how this fits into the
-rest of the app.
+Wires everything together and runs the proxy. See
+[../../ARCHITECTURE.md](../../ARCHITECTURE.md) for the high-level picture.
 
 ## API
 
-- `App` holds the shared `Clock` (see
-  [../service/clock/README.md](../service/clock/README.md)) and `Printer`
-  (see [../service/printer/README.md](../service/printer/README.md)).
-- `Start(ctx context.Context) *App` — creates them and starts **two**
-  background goroutines, both tracked by an internal `sync.WaitGroup`:
-  `clk.Run(ctx, p)` (ticking and queuing lines) and `p.Run(ctx)` (the
-  printer's own worker, actually writing them). Returns immediately.
-- `(*App).Wait()` — blocks until both of those goroutines have exited.
-  Requires `ctx` to already be cancelled (or about to be), otherwise it
-  blocks forever; see the shutdown sequence below.
-- `(*App).Run(ctx context.Context, uiMode bool, autoSwitch <-chan struct{}) error`
-  — runs a single mode to completion: `ui.RunUI(a.Clock, a.Printer,
-  autoSwitch)` if `uiMode`, otherwise `ui.RunConsole(ctx)`. `autoSwitch` is
-  only meaningful (and only used) when `uiMode` is set.
+- `Main(meta cli.Meta) int` — the program entry point (called from
+  `cmd/kpx`). It sets up a signal-cancellable context and the async
+  `printer`, parses the CLI, and dispatches the action: print help/version,
+  encrypt a password, or `run` the proxy. Returns the process exit code.
 
-## How `cmd/tview-tests/main.go` drives this
+## What `run` wires
 
-`main.go` parses the `--ui` flag and a `signal.NotifyContext` for Ctrl-C,
-calls `app.Start(ctx)` to get the shared `*App`, builds the external
-auto-switch trigger if `--ui` was given (see
-[../ui/README.md](../ui/README.md)), and calls `a.Run(ctx, *uiMode,
-autoSwitch)`.
+1. `config.Load(args)` → resolved `ProxyConf`.
+2. `askCredentials` — interactive prompts for missing login/password.
+3. `genCerts` — builds the `cert.Manager` when a rule uses MITM (load/create
+   the CA from `<name>.ca.crt`/`.ca.key`).
+4. `kerberos.NewStore` + `loadKerberos` — initial login for used kerberos
+   proxies (password or native OS).
+5. `router.NewRouter` + `upstream.NewSelector`.
+6. `processor.NewRuntime` — bundles the above behind an atomic snapshot.
+7. background tasks: auto-exit timeout, `config.Watch` → `reloader.reload`
+   (hot-reload with credential feasibility), and the self-`update` loop.
+8. `server.New(...).Run(ctx)` — the listeners, blocking until shutdown.
 
-Once that call returns, `main.go` runs the shutdown sequence: `cancel()`
-the context (telling `Clock.Run` and `Printer.Run` to stop) and then
-`a.Wait()` (blocking until the printer has actually drained its queue and
-both background goroutines have exited) *before* checking the error and
-possibly calling `os.Exit`. This is what makes the printer's asynchrony
-safe: without waiting, a line queued just before exit could be silently
-dropped when the process terminates.
+Shutdown is by context cancellation: a signal (SIGINT/SIGTERM), the
+auto-exit timeout, or a self-update restart all cancel the runtime context,
+which stops the listeners and the background tasks.
+
+## Limitations
+
+- **Console UI not wired.** `--ui` / `ui: true` is parsed but the console/
+  tview UI is reconciled in a later step (MIGRATION.md step 14); the proxy
+  currently runs in plain logging mode.
+- **Self-update restart exits via shutdown, not code 200.** The old behavior
+  exited with code 200 to signal an external restarter; here a successful
+  self-update just stops the runtime. Revisit if an exit-code contract is
+  needed.
+- **`askCredentials`/reload mutate the resolved config in place** (setting
+  `Login`/`Password`); acceptable at load time but noted against the
+  immutability goal (IDEAS.md).
