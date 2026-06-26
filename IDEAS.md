@@ -138,3 +138,9 @@ port is stabilized.
 - **Kerberos/cert not swapped on reload.** Only conf/router/selector are
   republished; the kerberos store and cert manager are kept across reloads
   (as before). Revisit if krb5 config or MITM rules change on reload.
+
+## internal/update (step 12, from kpx/main.go)
+
+- **No checksum/signature verification** of the downloaded binary; add before
+  trusting auto-update.
+- **amd64-only asset table**; extend to arm64 etc.
